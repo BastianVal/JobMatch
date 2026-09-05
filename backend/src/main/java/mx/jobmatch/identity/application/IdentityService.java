@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 import static mx.jobmatch.identity.application.IdentityExceptions.*;
 
@@ -22,15 +23,18 @@ public class IdentityService {
     private final SessionRevocationPort sessions;
     private final PasswordEncoder passwords;
     private final TokenCodec tokenCodec;
+    private final List<PersonalDataDeletionPort> personalDataDeleters;
 
     public IdentityService(AccountRepository accounts, EmailTokenRepository tokens, BackgroundTaskPort tasks,
-                           SessionRevocationPort sessions, PasswordEncoder passwords, TokenCodec tokenCodec) {
+                           SessionRevocationPort sessions, PasswordEncoder passwords, TokenCodec tokenCodec,
+                           List<PersonalDataDeletionPort> personalDataDeleters) {
         this.accounts = accounts;
         this.tokens = tokens;
         this.tasks = tasks;
         this.sessions = sessions;
         this.passwords = passwords;
         this.tokenCodec = tokenCodec;
+        this.personalDataDeleters = personalDataDeleters;
     }
 
     @Transactional
@@ -71,6 +75,7 @@ public class IdentityService {
 
     @Transactional
     public void delete(UUID accountId) {
+        personalDataDeleters.forEach(deleter -> deleter.deleteForAccount(accountId));
         if (!accounts.anonymizeAndMarkDeletionPending(accountId)) throw new AccountNotFound();
         tokens.deleteForAccount(accountId);
         sessions.revokeAll(accountId);

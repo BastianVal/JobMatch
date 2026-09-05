@@ -9,6 +9,9 @@ import mx.jobmatch.identity.application.IdentityExceptions.AuthenticationRateLim
 import mx.jobmatch.identity.application.IdentityExceptions.InvalidCredentials;
 import mx.jobmatch.identity.application.IdentityExceptions.InvalidPassword;
 import mx.jobmatch.identity.application.IdentityExceptions.InvalidToken;
+import mx.jobmatch.profile.application.ProfileExceptions.InvalidCatalogReference;
+import mx.jobmatch.profile.application.ProfileExceptions.InvalidProfile;
+import mx.jobmatch.profile.application.ProfileExceptions.VersionConflict;
 import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +69,21 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AuthenticationRateLimited.class)
     ProblemDetail authenticationRateLimited() {
         return problem(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "Demasiados intentos. Intenta más tarde.", null, true);
+    }
+
+    @ExceptionHandler(VersionConflict.class)
+    ProblemDetail versionConflict() {
+        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "El perfil cambió; vuelve a cargarlo antes de guardar.", null, false);
+    }
+
+    @ExceptionHandler(InvalidCatalogReference.class)
+    ProblemDetail invalidCatalogReference() {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "El rol o habilidad de catálogo no es válido.", null, false);
+    }
+
+    @ExceptionHandler(InvalidProfile.class)
+    ProblemDetail invalidProfile(InvalidProfile failure) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

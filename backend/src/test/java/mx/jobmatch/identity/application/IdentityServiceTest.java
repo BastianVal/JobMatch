@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +22,8 @@ class IdentityServiceTest {
     SessionRevocationPort sessions = mock(SessionRevocationPort.class);
     PasswordEncoder passwords = mock(PasswordEncoder.class);
     TokenCodec codec = new TokenCodec("a-test-secret-with-at-least-thirty-two-characters");
-    IdentityService service = new IdentityService(accounts, tokens, tasks, sessions, passwords, codec);
+    PersonalDataDeletionPort personalData = mock(PersonalDataDeletionPort.class);
+    IdentityService service = new IdentityService(accounts, tokens, tasks, sessions, passwords, codec, List.of(personalData));
 
     @BeforeEach
     void defaults() {
@@ -56,5 +58,6 @@ class IdentityServiceTest {
         verify(accounts, never()).anonymizeAndMarkDeletionPending(anotherAccount);
         verify(tokens).deleteForAccount(owner);
         verify(sessions).revokeAll(owner);
+        verify(personalData).deleteForAccount(owner);
     }
 }

@@ -27,3 +27,7 @@ Las decisiones arquitectónicas están en [`docs/adr`](docs/adr/README.md) y los
 ## Identidad y acceso (Fase 1)
 
 La API ofrece registro, verificación por correo, sesión propia con CSRF, recuperación de contraseña y eliminación de cuenta. El flujo y ejemplos están en [`docs/phase-1.md`](docs/phase-1.md).
+
+## Catálogo y perfil manual (Fase 2)
+
+La API permite consultar roles y habilidades normalizados y construir el perfil profesional completo sin importar un CV. El contrato, las reglas de concurrencia y el cálculo de experiencia están en [`docs/phase-2.md`](docs/phase-2.md).
