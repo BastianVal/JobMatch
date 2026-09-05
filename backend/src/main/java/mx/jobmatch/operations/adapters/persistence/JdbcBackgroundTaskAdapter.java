@@ -19,14 +19,20 @@ public class JdbcBackgroundTaskAdapter implements BackgroundTaskPort {
 
     @Override
     public BackgroundTask enqueue(String type, String payload, String key, Instant availableAt) {
+        return enqueue(type, payload, key, availableAt, 5);
+    }
+
+    @Override
+    public BackgroundTask enqueue(String type, String payload, String key, Instant availableAt, int maxAttempts) {
         UUID id = UUID.randomUUID();
         return jdbc.sql("""
-                INSERT INTO ops.background_task(public_id, task_type, payload, deduplication_key, available_at)
-                VALUES (:id, :type, CAST(:payload AS jsonb), :key, :availableAt)
+                INSERT INTO ops.background_task(public_id, task_type, payload, deduplication_key, available_at, max_attempts)
+                VALUES (:id, :type, CAST(:payload AS jsonb), :key, :availableAt, :maxAttempts)
                 ON CONFLICT (task_type, deduplication_key) DO UPDATE SET task_type = EXCLUDED.task_type
                 RETURNING public_id, task_type, payload::text, deduplication_key, status, attempts, available_at
                 """).param("id", id).param("type", type).param("payload", payload).param("key", key)
-                .param("availableAt", Timestamp.from(availableAt)).query(this::map).single();
+                .param("availableAt", Timestamp.from(availableAt)).param("maxAttempts", maxAttempts)
+                .query(this::map).single();
     }
 
     @Override
@@ -73,6 +79,15 @@ public class JdbcBackgroundTaskAdapter implements BackgroundTaskPort {
                 WHERE public_id=:id AND status='RUNNING' AND leased_by=:workerId
                 """).param("id", publicId).param("workerId", workerId).param("error", error)
                 .param("availableAt", Timestamp.from(availableAt)).update();
+    }
+
+    @Override
+    public void fail(UUID publicId, String workerId, String error) {
+        jdbc.sql("""
+                UPDATE ops.background_task
+                SET status='FAILED', leased_until=NULL, leased_by=NULL, last_error_code=:error, updated_at=now()
+                WHERE public_id=:id AND status='RUNNING' AND leased_by=:workerId
+                """).param("id", publicId).param("workerId", workerId).param("error", error).update();
     }
 
     private BackgroundTask map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {

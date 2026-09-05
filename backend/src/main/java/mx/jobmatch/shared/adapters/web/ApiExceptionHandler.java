@@ -15,6 +15,8 @@ import mx.jobmatch.profile.application.ProfileExceptions.VersionConflict;
 import mx.jobmatch.discovery.application.DiscoveryExceptions.InvalidSearch;
 import mx.jobmatch.discovery.application.DiscoveryExceptions.ResourceNotFound;
 import mx.jobmatch.discovery.application.DiscoveryExceptions.SavedSearchLimitReached;
+import mx.jobmatch.ingestion.application.IngestionExceptions.InvalidRefresh;
+import mx.jobmatch.ingestion.application.IngestionExceptions.RefreshNotFound;
 import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +108,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(SavedSearchLimitReached.class)
     ProblemDetail savedSearchLimit() {
         return problem(HttpStatus.CONFLICT, "SAVED_SEARCH_LIMIT_REACHED", "Solo puedes guardar 20 búsquedas.", null, false);
+    }
+
+    @ExceptionHandler(InvalidRefresh.class)
+    ProblemDetail invalidRefresh(InvalidRefresh failure) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
+    }
+
+    @ExceptionHandler(RefreshNotFound.class)
+    ProblemDetail refreshNotFound() {
+        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
     }
 
     @ExceptionHandler(InvalidCatalogReference.class)

@@ -2,6 +2,7 @@ package mx.jobmatch.operations.adapters.worker;
 
 import mx.jobmatch.operations.application.BackgroundTaskPort;
 import mx.jobmatch.operations.application.BackgroundTaskHandler;
+import mx.jobmatch.operations.application.NonRetryableTaskException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,9 +43,14 @@ public class DemoTaskWorker {
                         .orElseThrow(() -> new IllegalStateException("No handler for " + claimed.type()))
                         .handle(claimed);
                 transactions.executeWithoutResult(status -> tasks.complete(claimed.publicId(), workerId));
+            } catch (NonRetryableTaskException failure) {
+                transactions.executeWithoutResult(status -> tasks.fail(claimed.publicId(), workerId,
+                        failure.safeCode()));
             } catch (RuntimeException failure) {
+                long delaySeconds = Math.min(60, 1L << Math.min(6, Math.max(0, claimed.attempts() - 1)));
+                long jitter = Math.floorMod(claimed.publicId().hashCode(), Math.max(1, delaySeconds));
                 transactions.executeWithoutResult(status -> tasks.retry(claimed.publicId(), workerId,
-                        "TASK_HANDLER_FAILED", Instant.now().plusSeconds(5)));
+                        "TASK_HANDLER_FAILED", Instant.now().plusSeconds(delaySeconds + jitter)));
             }
         });
     }

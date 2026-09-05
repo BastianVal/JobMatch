@@ -1,0 +1,73 @@
+package mx.jobmatch.ingestion.adapters.worker;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import mx.jobmatch.ingestion.application.ConnectorFailure;
+import mx.jobmatch.ingestion.application.ConnectorPort;
+import mx.jobmatch.ingestion.application.IngestionRepository;
+import mx.jobmatch.ingestion.application.IngestionService;
+import mx.jobmatch.operations.application.BackgroundTaskHandler;
+import mx.jobmatch.operations.application.NonRetryableTaskException;
+import mx.jobmatch.operations.domain.BackgroundTask;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+@Profile("worker")
+@Component
+public class ConnectorSyncTaskHandler implements BackgroundTaskHandler {
+    private final IngestionRepository repository;
+    private final IngestionService ingestion;
+    private final List<ConnectorPort> connectors;
+    private final ObjectMapper json;
+
+    public ConnectorSyncTaskHandler(IngestionRepository repository, IngestionService ingestion,
+                                    List<ConnectorPort> connectors, ObjectMapper json) {
+        this.repository = repository;
+        this.ingestion = ingestion;
+        this.connectors = connectors;
+        this.json = json;
+    }
+
+    @Override public boolean supports(String taskType) { return "SYNC_CONNECTOR".equals(taskType); }
+
+    @Override
+    public void handle(BackgroundTask task) {
+        Payload payload = read(task.payload());
+        var query = repository.findQuery(payload.queryId()).orElseThrow();
+        UUID runId = repository.startRun(payload.queryId(), payload.refreshId());
+        try {
+            if (!repository.acquireRequestPermit(query.sourceKey(), payload.queryId(), task.publicId(), Instant.now()))
+                throw new ConnectorFailure("SOURCE_UNAVAILABLE", true);
+            ConnectorPort connector = connectors.stream().filter(item -> item.sourceKey().equals(query.sourceKey()))
+                    .findFirst().orElseThrow(() -> new ConnectorFailure("CONNECTOR_NOT_CONFIGURED", false));
+            var page = connector.fetch(query.query());
+            ingestion.ingestPage(runId, query.sourceKey(), page);
+            repository.sourceSucceeded(query.sourceKey());
+            if (payload.refreshId() != null) repository.connectorCompleted(payload.refreshId());
+        } catch (ConnectorFailure failure) {
+            repository.sourceFailed(query.sourceKey(), Instant.now());
+            repository.failRun(runId, failure.safeCode());
+            if (payload.refreshId() != null && (!failure.retryable() || task.attempts() >= 3))
+                repository.connectorFailed(payload.refreshId());
+            if (!failure.retryable()) throw new NonRetryableTaskException(failure.safeCode());
+            throw failure;
+        } catch (RuntimeException failure) {
+            repository.sourceFailed(query.sourceKey(), Instant.now());
+            repository.failRun(runId, "CONNECTOR_PIPELINE_FAILED");
+            if (payload.refreshId() != null && task.attempts() >= 3) repository.connectorFailed(payload.refreshId());
+            throw failure;
+        } finally {
+            repository.releaseRequestPermit(query.sourceKey(), payload.queryId(), task.publicId());
+        }
+    }
+
+    private Payload read(String value) {
+        try { return json.readValue(value, Payload.class); }
+        catch (Exception invalid) { throw new IllegalArgumentException("Invalid sync task payload"); }
+    }
+
+    public record Payload(UUID queryId, UUID refreshId) {}
+}

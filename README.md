@@ -35,3 +35,7 @@ La API permite consultar roles y habilidades normalizados y construir el perfil 
 ## Vacantes y búsqueda local (Fase 3)
 
 PostgreSQL almacena vacantes canónicas, sus publicaciones y la proyección de texto/filtros. La API ofrece búsqueda por cursor, detalle y búsquedas guardadas; consulta [`docs/phase-3.md`](docs/phase-3.md) para el contrato y el generador local de hasta un millón de fixtures.
+
+## Ingesta y deduplicación (Fase 4)
+
+El worker comparte consultas, procesa cinco fuentes de forma independiente y consolida publicaciones con reglas auditables de identidad, similitud y vigencia. El flujo local determinista, la API de actualización y las políticas operativas están en [`docs/phase-4.md`](docs/phase-4.md).

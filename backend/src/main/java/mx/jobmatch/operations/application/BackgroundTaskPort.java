@@ -8,9 +8,15 @@ import java.util.UUID;
 
 public interface BackgroundTaskPort {
     BackgroundTask enqueue(String type, String payload, String deduplicationKey, Instant availableAt);
+    default BackgroundTask enqueue(String type, String payload, String deduplicationKey, Instant availableAt,
+                                   int maxAttempts) {
+        return enqueue(type, payload, deduplicationKey, availableAt);
+    }
     Optional<BackgroundTask> find(UUID publicId);
     Optional<BackgroundTask> claimNext(String workerId, Duration lease);
     void complete(UUID publicId, String workerId);
     void retry(UUID publicId, String workerId, String safeErrorCode, Instant availableAt);
+    default void fail(UUID publicId, String workerId, String safeErrorCode) {
+        retry(publicId, workerId, safeErrorCode, Instant.now());
+    }
 }
-
