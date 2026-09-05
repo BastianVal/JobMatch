@@ -25,6 +25,10 @@ spring:
       mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 management:
   endpoints:
     web:
@@ -56,3 +60,9 @@ jobmatch:
   worker:
     poll-delay-ms: 1000
     lease-seconds: 60
+  cv:
+    storage-root: ${CV_STORAGE_ROOT:/var/lib/jobmatch/cv}
+    max-file-bytes: 5242880
+    max-active-documents: 5
+    parse-timeout-seconds: 60
+    proposal-lifetime-days: 30

@@ -39,3 +39,7 @@ PostgreSQL almacena vacantes canónicas, sus publicaciones y la proyección de t
 ## Ingesta y deduplicación (Fase 4)
 
 El worker comparte consultas, procesa cinco fuentes de forma independiente y consolida publicaciones con reglas auditables de identidad, similitud y vigencia. El flujo local determinista, la API de actualización y las políticas operativas están en [`docs/phase-4.md`](docs/phase-4.md).
+
+## Importación de CV (Fase 5)
+
+PDF textuales y DOCX se almacenan con nombres internos aleatorios y se extraen en el worker. El usuario revisa cada propuesta y resuelve duplicados antes de una confirmación atómica que recalcula el perfil. El contrato, límites y prueba integral están en [`docs/phase-5.md`](docs/phase-5.md).
