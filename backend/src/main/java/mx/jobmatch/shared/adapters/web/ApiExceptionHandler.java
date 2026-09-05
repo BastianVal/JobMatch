@@ -4,6 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import mx.jobmatch.operations.application.IdempotencyConflictException;
 import mx.jobmatch.operations.application.TaskNotFoundException;
+import mx.jobmatch.identity.application.IdentityExceptions.AccountNotFound;
+import mx.jobmatch.identity.application.IdentityExceptions.AuthenticationRateLimited;
+import mx.jobmatch.identity.application.IdentityExceptions.InvalidCredentials;
+import mx.jobmatch.identity.application.IdentityExceptions.InvalidPassword;
+import mx.jobmatch.identity.application.IdentityExceptions.InvalidToken;
 import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +41,31 @@ public class ApiExceptionHandler {
     @ExceptionHandler(TaskNotFoundException.class)
     ProblemDetail notFound() {
         return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
+    }
+
+    @ExceptionHandler(AccountNotFound.class)
+    ProblemDetail accountNotFound() {
+        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
+    }
+
+    @ExceptionHandler(InvalidToken.class)
+    ProblemDetail invalidToken() {
+        return problem(HttpStatus.BAD_REQUEST, "INVALID_OR_EXPIRED_TOKEN", "El enlace no es válido o expiró.", null, false);
+    }
+
+    @ExceptionHandler(InvalidPassword.class)
+    ProblemDetail invalidPassword() {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "La contraseña debe tener entre 12 y 128 caracteres.", null, false);
+    }
+
+    @ExceptionHandler(InvalidCredentials.class)
+    ProblemDetail invalidCredentials() {
+        return problem(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED", "El correo o la contraseña son incorrectos.", null, false);
+    }
+
+    @ExceptionHandler(AuthenticationRateLimited.class)
+    ProblemDetail authenticationRateLimited() {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "Demasiados intentos. Intenta más tarde.", null, true);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

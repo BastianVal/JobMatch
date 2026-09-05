@@ -9,6 +9,20 @@ spring:
       maximum-pool-size: 10
   flyway:
     enabled: false
+  session:
+    store-type: jdbc
+    timeout: 30m
+    jdbc:
+      initialize-schema: never
+      table-name: iam.spring_session
+  mail:
+    host: ${SMTP_HOST:mailpit}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
   jackson:
     default-property-inclusion: non_null
 management:
@@ -23,8 +37,22 @@ management:
       show-details: never
 server:
   shutdown: graceful
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        name: ${SESSION_COOKIE_NAME:__Host-jobmatch_session}
+        secure: ${SESSION_COOKIE_SECURE:true}
+        http-only: true
+        same-site: lax
+        path: /
 jobmatch:
+  security:
+    token-secret: ${TOKEN_SECRET:local-development-secret-change-this-before-production}
+    rate-limit-pepper: ${RATE_LIMIT_PEPPER:local-rate-limit-pepper}
+    public-base-url: ${PUBLIC_BASE_URL:http://localhost:8090}
+  mail:
+    from: ${MAIL_FROM:no-reply@jobmatch.local}
   worker:
     poll-delay-ms: 1000
     lease-seconds: 60
-

@@ -5,9 +5,24 @@ services:
   api:
     image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
     build: null
+    environment:
+      SESSION_COOKIE_NAME: __Host-jobmatch_session
+      SESSION_COOKIE_SECURE: "true"
+      TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET}
+      RATE_LIMIT_PEPPER: ${RATE_LIMIT_PEPPER:?set RATE_LIMIT_PEPPER}
+      PUBLIC_BASE_URL: https://${APP_HOST:?set APP_HOST}
   worker:
     image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
     build: null
+    environment:
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:?set SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?set SMTP_PASSWORD}
+      SMTP_AUTH: "true"
+      SMTP_STARTTLS: "true"
+      TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET}
+      PUBLIC_BASE_URL: https://${APP_HOST:?set APP_HOST}
   migrate:
     image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
     build: null
@@ -20,3 +35,5 @@ services:
       - ./deploy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+  mailpit:
+    profiles: ["local-only"]

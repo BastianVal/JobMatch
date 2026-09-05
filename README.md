@@ -12,17 +12,9 @@ Comprobaciones útiles:
 
 ```bash
 curl http://localhost:8090/actuator/health/readiness
-curl -i -X POST http://localhost:8090/api/v1/operations/demo-tasks \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: demo-1" \
-  -d '{"message":"hola"}'
 ```
 
-Repetir la segunda llamada con la misma clave devuelve la misma tarea. El worker la reclama con lease y la marca como completada. Para inspeccionarla:
-
-```bash
-curl http://localhost:8090/api/v1/operations/demo-tasks/<publicId>
-```
+Los endpoints de negocio requieren una sesión autenticada y protección CSRF; consulta el flujo de identidad más abajo.
 
 ## Desarrollo
 
@@ -31,3 +23,7 @@ curl http://localhost:8090/api/v1/operations/demo-tasks/<publicId>
 - Integración: `docker compose -f compose.yaml -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from backend-tests`.
 
 Las decisiones arquitectónicas están en [`docs/adr`](docs/adr/README.md) y los criterios de Fase 0 en [`docs/phase-0.md`](docs/phase-0.md).
+
+## Identidad y acceso (Fase 1)
+
+La API ofrece registro, verificación por correo, sesión propia con CSRF, recuperación de contraseña y eliminación de cuenta. El flujo y ejemplos están en [`docs/phase-1.md`](docs/phase-1.md).

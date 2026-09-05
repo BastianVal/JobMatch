@@ -1,6 +1,7 @@
 package mx.jobmatch.operations.adapters.worker;
 
 import mx.jobmatch.operations.application.BackgroundTaskPort;
+import mx.jobmatch.operations.application.BackgroundTaskHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,19 +12,23 @@ import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 
 @Profile("worker")
 @Component
 public class DemoTaskWorker {
     private final BackgroundTaskPort tasks;
     private final TransactionTemplate transactions;
+    private final List<BackgroundTaskHandler> handlers;
     private final Duration lease;
     private final String workerId;
 
     public DemoTaskWorker(BackgroundTaskPort tasks, TransactionTemplate transactions,
+                          List<BackgroundTaskHandler> handlers,
                           @Value("${jobmatch.worker.lease-seconds:60}") long leaseSeconds) {
         this.tasks = tasks;
         this.transactions = transactions;
+        this.handlers = handlers;
         this.lease = Duration.ofSeconds(leaseSeconds);
         this.workerId = hostname() + ":" + UUID.randomUUID();
     }
@@ -33,11 +38,13 @@ public class DemoTaskWorker {
         var task = transactions.execute(status -> tasks.claimNext(workerId, lease));
         task.ifPresent(claimed -> {
             try {
-                // Handler demostrativo: la persistencia del estado prueba entrega durable.
+                handlers.stream().filter(handler -> handler.supports(claimed.type())).findFirst()
+                        .orElseThrow(() -> new IllegalStateException("No handler for " + claimed.type()))
+                        .handle(claimed);
                 transactions.executeWithoutResult(status -> tasks.complete(claimed.publicId(), workerId));
             } catch (RuntimeException failure) {
                 transactions.executeWithoutResult(status -> tasks.retry(claimed.publicId(), workerId,
-                        "DEMO_HANDLER_FAILED", Instant.now().plusSeconds(5)));
+                        "TASK_HANDLER_FAILED", Instant.now().plusSeconds(5)));
             }
         });
     }
@@ -47,4 +54,3 @@ public class DemoTaskWorker {
         catch (Exception ignored) { return "worker"; }
     }
 }
-
