@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: jobmatch
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jobmatch}
+    username: ${SPRING_DATASOURCE_USERNAME:jobmatch}
+    password: ${SPRING_DATASOURCE_PASSWORD:jobmatch-local}
+    hikari:
+      maximum-pool-size: 10
+  flyway:
+    enabled: false
+  jackson:
+    default-property-inclusion: non_null
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+server:
+  shutdown: graceful
+jobmatch:
+  worker:
+    poll-delay-ms: 1000
+    lease-seconds: 60
+

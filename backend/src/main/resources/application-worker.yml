@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: worker
+  flyway:
+    enabled: false
+  main:
+    web-application-type: none
+

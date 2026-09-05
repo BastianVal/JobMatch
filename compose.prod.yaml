@@ -1,0 +1,22 @@
+services:
+  postgres:
+    volumes:
+      - /srv/jobmatch/postgres:/var/lib/postgresql/data
+  api:
+    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: null
+  worker:
+    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: null
+  migrate:
+    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: null
+  caddy:
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config

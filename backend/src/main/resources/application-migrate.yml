@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: migrate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  main:
+    web-application-type: none
+
