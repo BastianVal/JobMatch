@@ -31,3 +31,7 @@ La API ofrece registro, verificación por correo, sesión propia con CSRF, recup
 ## Catálogo y perfil manual (Fase 2)
 
 La API permite consultar roles y habilidades normalizados y construir el perfil profesional completo sin importar un CV. El contrato, las reglas de concurrencia y el cálculo de experiencia están en [`docs/phase-2.md`](docs/phase-2.md).
+
+## Vacantes y búsqueda local (Fase 3)
+
+PostgreSQL almacena vacantes canónicas, sus publicaciones y la proyección de texto/filtros. La API ofrece búsqueda por cursor, detalle y búsquedas guardadas; consulta [`docs/phase-3.md`](docs/phase-3.md) para el contrato y el generador local de hasta un millón de fixtures.

@@ -12,14 +12,20 @@ import mx.jobmatch.identity.application.IdentityExceptions.InvalidToken;
 import mx.jobmatch.profile.application.ProfileExceptions.InvalidCatalogReference;
 import mx.jobmatch.profile.application.ProfileExceptions.InvalidProfile;
 import mx.jobmatch.profile.application.ProfileExceptions.VersionConflict;
+import mx.jobmatch.discovery.application.DiscoveryExceptions.InvalidSearch;
+import mx.jobmatch.discovery.application.DiscoveryExceptions.ResourceNotFound;
+import mx.jobmatch.discovery.application.DiscoveryExceptions.SavedSearchLimitReached;
 import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.util.Map;
@@ -34,6 +40,12 @@ public class ApiExceptionHandler {
         var fields = ex.getBindingResult().getFieldErrors().stream().collect(Collectors.toMap(
                 error -> error.getField(), error -> error.getDefaultMessage(), (first, ignored) -> first));
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "La solicitud contiene datos inválidos.", fields, false);
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            MissingRequestHeaderException.class})
+    ProblemDetail malformedRequest() {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "La solicitud contiene datos inválidos.", null, false);
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)
@@ -73,7 +85,27 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(VersionConflict.class)
     ProblemDetail versionConflict() {
-        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "El perfil cambió; vuelve a cargarlo antes de guardar.", null, false);
+        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "El recurso cambió; vuelve a cargarlo antes de guardar.", null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.discovery.application.DiscoveryExceptions.VersionConflict.class)
+    ProblemDetail discoveryVersionConflict() {
+        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "El recurso cambió; vuelve a cargarlo antes de guardar.", null, false);
+    }
+
+    @ExceptionHandler(ResourceNotFound.class)
+    ProblemDetail discoveryNotFound() {
+        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
+    }
+
+    @ExceptionHandler(InvalidSearch.class)
+    ProblemDetail invalidSearch(InvalidSearch failure) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
+    }
+
+    @ExceptionHandler(SavedSearchLimitReached.class)
+    ProblemDetail savedSearchLimit() {
+        return problem(HttpStatus.CONFLICT, "SAVED_SEARCH_LIMIT_REACHED", "Solo puedes guardar 20 búsquedas.", null, false);
     }
 
     @ExceptionHandler(InvalidCatalogReference.class)
