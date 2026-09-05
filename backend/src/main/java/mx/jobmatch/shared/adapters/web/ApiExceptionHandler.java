@@ -163,6 +163,41 @@ public class ApiExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
     }
 
+    @ExceptionHandler(mx.jobmatch.matching.application.MatchingExceptions.ProfileRequired.class)
+    ProblemDetail matchingProfileRequired() {
+        return problem(HttpStatus.CONFLICT, "PROFILE_REQUIRED", "Completa tu perfil antes de calcular compatibilidad.", null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.matching.application.MatchingExceptions.JobNotFound.class)
+    ProblemDetail matchingJobNotFound() {
+        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "La vacante no existe.", null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.matching.application.MatchingExceptions.InvalidMatchingRequest.class)
+    ProblemDetail invalidArgument(mx.jobmatch.matching.application.MatchingExceptions.InvalidMatchingRequest failure) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.tracking.application.TrackingExceptions.ResourceNotFound.class)
+    ProblemDetail trackingNotFound() {
+        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "La vacante o el seguimiento no existe.", null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.tracking.application.TrackingExceptions.VersionConflict.class)
+    ProblemDetail trackingVersionConflict() {
+        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "El seguimiento cambió; vuelve a cargarlo antes de guardar.", null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.tracking.application.TrackingExceptions.InvalidTransition.class)
+    ProblemDetail invalidTrackingTransition(mx.jobmatch.tracking.application.TrackingExceptions.InvalidTransition failure) {
+        return problem(HttpStatus.CONFLICT, "INVALID_TRACKING_TRANSITION", failure.getMessage(), null, false);
+    }
+
+    @ExceptionHandler(mx.jobmatch.tracking.application.TrackingExceptions.InvalidTrackingRequest.class)
+    ProblemDetail invalidTrackingRequest(mx.jobmatch.tracking.application.TrackingExceptions.InvalidTrackingRequest failure) {
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", failure.getMessage(), null, false);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail constraintViolation(ConstraintViolationException ex) {
         var fields = ex.getConstraintViolations().stream().collect(Collectors.toMap(

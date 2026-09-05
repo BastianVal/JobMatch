@@ -43,3 +43,13 @@ El worker comparte consultas, procesa cinco fuentes de forma independiente y con
 ## Importación de CV (Fase 5)
 
 PDF textuales y DOCX se almacenan con nombres internos aleatorios y se extraen en el worker. El usuario revisa cada propuesta y resuelve duplicados antes de una confirmación atómica que recalcula el perfil. El contrato, límites y prueba integral están en [`docs/phase-5.md`](docs/phase-5.md).
+
+## Matching y recomendaciones (Fase 6)
+
+El motor `score-1` produce puntajes deterministas por seis componentes y conserva snapshots de requisitos y evidencias. La caché se separa por las versiones de perfil, vacante, catálogo y algoritmo; las recomendaciones respetan roles objetivo, preferencias y exclusiones. Consulta [`docs/phase-6.md`](docs/phase-6.md).
+
+## Seguimiento e integración UX (Fase 7)
+
+La aplicación registra impresiones por lote, deriva el indicador de vacante nueva y permite guardar, descartar y seguir una postulación hasta su resultado final. Las transiciones conservan historial, usan `If-Match` para concurrencia optimista e `Idempotency-Key` para reintentos seguros.
+
+La SPA React integra autenticación, perfil, CV, búsqueda, recomendaciones explicables y seguimiento, incluidos estados pendientes y errores recuperables. Consulta [`docs/phase-7.md`](docs/phase-7.md).
