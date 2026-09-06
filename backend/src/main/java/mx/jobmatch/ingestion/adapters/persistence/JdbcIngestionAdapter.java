@@ -1,5 +1,6 @@
 package mx.jobmatch.ingestion.adapters.persistence;
 
+import mx.jobmatch.catalog.application.CatalogRoleResolver;
 import mx.jobmatch.ingestion.application.IngestionRepository;
 import mx.jobmatch.ingestion.domain.ConnectorQuery;
 import mx.jobmatch.ingestion.domain.DeduplicationPolicy;
@@ -24,8 +25,12 @@ import static mx.jobmatch.ingestion.application.IngestionExceptions.InvalidRefre
 public class JdbcIngestionAdapter implements IngestionRepository {
     private static final List<String> SOURCES = List.of("JOOBLE", "ADZUNA", "GREENHOUSE", "LEVER", "ASHBY");
     private final JdbcClient jdbc;
+    private final CatalogRoleResolver roles;
 
-    public JdbcIngestionAdapter(JdbcClient jdbc) { this.jdbc = jdbc; }
+    public JdbcIngestionAdapter(JdbcClient jdbc, CatalogRoleResolver roles) {
+        this.jdbc = jdbc;
+        this.roles = roles;
+    }
 
     @Override
     public Schedule schedule(UUID accountId, UUID roleFamilyId, String roleQuery, String locationQuery, Instant now) {
@@ -300,7 +305,13 @@ public class JdbcIngestionAdapter implements IngestionRepository {
     }
 
     private JobRow createJob(NormalizedPosting p, long employerId, String identityKey) {
-        Long role = resolveRole(p.titleNormalized());
+        var resolution = roles.resolve(p.title()).orElse(null);
+        Long role = resolution == null ? null : jdbc.sql("""
+                SELECT role.id FROM catalog.role_family role
+                JOIN catalog.catalog_version version ON version.id=role.catalog_version_id
+                WHERE role.public_id=:id AND role.active AND version.status='PUBLISHED'
+                """).param("id", resolution.roleFamilyId()).query(Long.class).optional().orElse(null);
+        String seniority = p.seniority() != null ? p.seniority() : resolution == null ? null : resolution.seniority();
         JobRow job = jdbc.sql("""
                 INSERT INTO jobs.canonical_job(public_id,identity_key,employer_id,role_family_id,title,title_normalized,
                   description,seniority,remote_mode,employment_type,salary_min_monthly,salary_max_monthly,currency,published_at,status)
@@ -308,7 +319,7 @@ public class JdbcIngestionAdapter implements IngestionRepository {
                   :salaryMin,:salaryMax,:currency,:published,'ACTIVE') RETURNING id,public_id
                 """).param("id",UUID.randomUUID()).param("identity",identityKey).param("employer",employerId).param("role",role)
                 .param("title",p.title()).param("titleKey",p.titleNormalized()).param("description",p.description())
-                .param("seniority",p.seniority()).param("remote",p.remoteMode()).param("employment",p.employmentType())
+                .param("seniority",seniority).param("remote",p.remoteMode()).param("employment",p.employmentType())
                 .param("salaryMin",p.salaryMinMonthly()).param("salaryMax",p.salaryMaxMonthly()).param("currency",p.currency())
                 .param("published",Timestamp.from(p.publishedAt())).query((rs,n)->new JobRow(rs.getLong("id"),rs.getObject("public_id",UUID.class))).single();
         jdbc.sql("""
@@ -322,13 +333,6 @@ public class JdbcIngestionAdapter implements IngestionRepository {
         return job;
     }
 
-    private Long resolveRole(String title) {
-        String uuid = title.contains("data") ? "11000000-0000-0000-0000-000000000002"
-                : title.contains("devops") || title.contains("platform") ? "11000000-0000-0000-0000-000000000003"
-                : title.contains("product") ? "11000000-0000-0000-0000-000000000004"
-                : "11000000-0000-0000-0000-000000000001";
-        return jdbc.sql("SELECT id FROM catalog.role_family WHERE public_id=:id").param("id",UUID.fromString(uuid)).query(Long.class).single();
-    }
     private void inferSkill(long jobId, NormalizedPosting p) {
         String text=(p.titleNormalized()+" "+PostingNormalizer.key(p.description()));
         String skill=text.contains("java")?"12000000-0000-0000-0000-000000000001":text.contains("docker")?"12000000-0000-0000-0000-000000000007":null;

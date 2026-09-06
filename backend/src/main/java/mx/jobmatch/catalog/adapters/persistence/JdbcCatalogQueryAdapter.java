@@ -19,28 +19,29 @@ public class JdbcCatalogQueryAdapter implements CatalogQueryPort {
 
     @Override
     public List<CatalogEntry> roles(String query, int limit) {
-        return search("role_family", "role_alias", "role_family_id", query, limit);
+        return search("role_family", "role_alias", "role_family_id", "AND item.selectable", query, limit);
     }
 
     @Override
     public List<CatalogEntry> skills(String query, int limit) {
-        return search("skill", "skill_alias", "skill_id", query, limit);
+        return search("skill", "skill_alias", "skill_id", "", query, limit);
     }
 
-    private List<CatalogEntry> search(String table, String aliasTable, String foreignKey, String query, int limit) {
+    private List<CatalogEntry> search(String table, String aliasTable, String foreignKey, String selectableFilter,
+                                      String query, int limit) {
         String term = query == null ? "" : query.strip();
         String sql = """
                 SELECT item.public_id, item.slug, item.display_name, version.version_no,
                        ARRAY(SELECT alias.alias::text FROM catalog.%s alias WHERE alias.%s=item.id ORDER BY alias.alias) aliases
                 FROM catalog.%s item
                 JOIN catalog.catalog_version version ON version.id=item.catalog_version_id
-                WHERE item.active AND version.status='PUBLISHED'
-                  AND (:term='' OR unaccent(lower(item.display_name)) LIKE unaccent(lower(:term)) || '%%'
+                WHERE item.active AND version.status='PUBLISHED' %s
+                  AND (:term='' OR unaccent(lower(item.display_name)) LIKE '%%' || unaccent(lower(:term)) || '%%'
                        OR EXISTS (SELECT 1 FROM catalog.%s alias WHERE alias.%s=item.id
-                                  AND unaccent(lower(alias.alias::text)) LIKE unaccent(lower(:term)) || '%%'))
+                                  AND unaccent(lower(alias.alias::text)) LIKE '%%' || unaccent(lower(:term)) || '%%'))
                 ORDER BY version.version_no DESC, item.display_name
                 LIMIT :limit
-                """.formatted(aliasTable, foreignKey, table, aliasTable, foreignKey);
+                """.formatted(aliasTable, foreignKey, table, selectableFilter, aliasTable, foreignKey);
         return jdbc.sql(sql).param("term", term).param("limit", Math.max(1, Math.min(limit, 25)))
                 .query((rs, row) -> new CatalogEntry(rs.getObject("public_id", UUID.class), rs.getString("slug"),
                         rs.getString("display_name"), array(rs.getArray("aliases")), rs.getInt("version_no"))).list();
