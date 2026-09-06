@@ -84,7 +84,8 @@ public class JdbcProfileAdapter implements ProfileRepository {
         for (var role : draft.targetRoles()) {
             int count = jdbc.sql("""
                     INSERT INTO profile.target_role(public_id, profile_id, role_family_id, priority)
-                    SELECT :id, :profileId, id, :priority FROM catalog.role_family WHERE public_id=:roleId AND active
+                    SELECT :id, :profileId, id, :priority FROM catalog.role_family
+                    WHERE public_id=:roleId AND active AND selectable
                     """).param("id", role.id()).param("profileId", profileId).param("priority", role.priority())
                     .param("roleId", role.roleFamilyId()).update();
             if (count != 1) throw new InvalidCatalogReference();

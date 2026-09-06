@@ -44,19 +44,19 @@ status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$coo
   --data "{\"email\":\"$email\",\"password\":\"$password\"}" "$base_url/api/v1/auth/login")"
 test "$status" = '204'
 
-status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/catalog/roles?q=desarrollo")"
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/catalog/roles?q=java")"
 test "$status" = '200'
-grep -q 'Desarrollo de software' "$body"
+grep -q 'Desarrollador Java' "$body"
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/catalog/skills?q=java")"
 test "$status" = '200'
-grep -q '"catalogVersion":1' "$body"
+grep -q '"catalogVersion":2' "$body"
 
 payload="$(printf '%s' '{
   "headline":"Backend engineer",
   "summary":"Construyo servicios confiables.",
   "location":"Ciudad de México",
   "seniority":"SENIOR",
-  "targetRoles":[{"roleFamilyId":"11000000-0000-0000-0000-000000000001","priority":1}],
+  "targetRoles":[{"roleFamilyId":"11100000-0000-0000-0000-000000000001","priority":1}],
   "preferences":{"remoteMode":"HYBRID","employmentType":"FULL_TIME","minimumMonthlySalary":50000,"currency":"MXN","willingToRelocate":false},
   "excludedEmployers":["Ácme","acme"],
   "trajectory":[
@@ -93,6 +93,17 @@ for endpoint in target-roles trajectory skills; do
   status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/me/$endpoint")"
   test "$status" = '200'
 done
+
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/me/cv-documents")"
+test "$status" = '200'
+test "$(cat "$body")" = '[]'
+
+old_role_payload="$(printf '%s' "$payload" | sed 's/11100000-0000-0000-0000-000000000001/11000000-0000-0000-0000-000000000001/')"
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "1"' \
+  --data "$old_role_payload" "$base_url/api/v1/me/profile")"
+test "$status" = '400'
+grep -q 'VALIDATION_FAILED' "$body"
 
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X DELETE \
   -H "X-CSRF-TOKEN: $csrf" "$base_url/api/v1/me/account")"

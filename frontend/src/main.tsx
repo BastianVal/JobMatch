@@ -1,6 +1,7 @@
 import React, { FormEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, errorMessage, resetCsrf } from './api';
+import { ProfileView } from './profile';
 import './styles.css';
 
 type Account = { id: string; email: string; status: string };
@@ -9,10 +10,6 @@ type Activity = { jobId: string; new: boolean; trackingId?: string; state?: Trac
 type Job = { id?: string; jobId?: string; title: string; employer: string; seniority?: string; remoteMode?: string; employmentType?: string; score?: number; classification?: string };
 type TrackingEvent = { id: string; fromState?: TrackingState; toState: TrackingState; note?: string; resultingVersion: number; occurredAt: string };
 type TrackedJob = { id: string; jobId: string; title: string; employer: string; state: TrackingState; note?: string; version: number; updatedAt: string; history: TrackingEvent[] };
-type TargetRole = { id: string; roleFamilyId: string; priority: number; name?: string };
-type ProfileData = Record<string, unknown> & { headline?: string; summary?: string; location?: string; seniority?: string; targetRoles: TargetRole[] };
-type Profile = { id: string; version: number; catalogVersion: number; data: ProfileData };
-type CatalogEntry = { id: string; name: string };
 type Match = { score: number; classification: string; reasons: { id: string; type: string; explanation: string; points: number }[] };
 type CvRun = { id: string; status: string; originalFilename: string; candidates: CvCandidate[]; safeErrorCode?: string };
 type CvCandidate = { id: string; type: string; proposal: Record<string, unknown>; decision: string; decisionVersion: number; duplicate?: { similarityScore: number; resolution?: string } };
@@ -99,16 +96,6 @@ function TrackingView({ notify }: { notify:(value:string)=>void }) {
   async function move(item:TrackedJob,target:TrackingState){try{await api(`/me/jobs/${item.jobId}/tracking`,{method:'PUT',headers:{'If-Match':String(item.version),'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({state:target,note:item.note})});notify(`Seguimiento actualizado a ${stateLabel[target]}.`);await load();}catch(e){notify(errorMessage(e));await load();}}
   if(loading)return <Loading label="Cargando seguimiento"/>; if(error)return <Retry message={error} onRetry={()=>void load()}/>; if(!items.length)return <Empty title="No hay vacantes en seguimiento" detail="Guarda o registra una postulación desde recomendaciones o búsqueda."/>;
   return <div className="tracking-list">{items.map(item=><article className="tracking-card" key={item.id}><div><span className={`state state-${item.state.toLowerCase()}`}>{stateLabel[item.state]}</span><h3>{item.title}</h3><p>{item.employer}</p></div><div className="actions">{transitions[item.state].map(state=><button key={state} onClick={()=>void move(item,state)}>{stateLabel[state]}</button>)}</div><details><summary>Historial · {item.history.length} eventos</summary><ol>{item.history.map(event=><li key={event.id}><time>{new Date(event.occurredAt).toLocaleDateString('es-MX')}</time> {event.fromState?`${stateLabel[event.fromState]} → `:''}{stateLabel[event.toState]}</li>)}</ol></details></article>)}</div>;
-}
-
-function ProfileView({ notify }: { notify:(value:string)=>void }) {
-  const [profile,setProfile]=useState<Profile>();const [roles,setRoles]=useState<CatalogEntry[]>([]);const [loading,setLoading]=useState(true);
-  async function load(){setLoading(true);try{const [current,catalog]=await Promise.all([api<Profile>('/me/profile'),api<CatalogEntry[]>('/catalog/roles?limit=100')]);setProfile(current);setRoles(catalog);}catch(e){notify(errorMessage(e));}finally{setLoading(false)}}
-  useEffect(()=>{void load()},[]); if(loading||!profile)return <Loading label="Cargando perfil"/>; const current=profile; const data=current.data;
-  function field(name:string,value:string){setProfile({...current,data:{...data,[name]:value}})}
-  function addRole(roleId:string){if(!roleId||data.targetRoles.some(role=>role.roleFamilyId===roleId))return;const found=roles.find(role=>role.id===roleId);setProfile({...current,data:{...data,targetRoles:[...data.targetRoles,{id:crypto.randomUUID(),roleFamilyId:roleId,priority:data.targetRoles.length+1,name:found?.name}]}})}
-  async function save(event:FormEvent){event.preventDefault();try{const saved=await api<Profile>('/me/profile',{method:'PUT',headers:{'If-Match':String(current.version)},body:JSON.stringify(data)});setProfile(saved);notify('Perfil guardado; las recomendaciones se actualizarán automáticamente.');}catch(e){notify(errorMessage(e));if(e instanceof ApiError&&e.problem.code==='VERSION_CONFLICT')await load();}}
-  return <form className="profile-form" onSubmit={save}><div className="form-grid"><label>Titular<input value={String(data.headline||'')} onChange={e=>field('headline',e.target.value)} maxLength={160}/></label><label>Ubicación<input value={String(data.location||'')} onChange={e=>field('location',e.target.value)} maxLength={160}/></label><label>Seniority<select value={String(data.seniority||'')} onChange={e=>field('seniority',e.target.value)}><option value="">Sin especificar</option>{['INTERN','JUNIOR','MID','SENIOR','LEAD','MANAGER','DIRECTOR'].map(value=><option key={value}>{value}</option>)}</select></label></div><label>Resumen<textarea value={String(data.summary||'')} onChange={e=>field('summary',e.target.value)} rows={5}/></label><fieldset><legend>Roles objetivo</legend><div className="chips">{data.targetRoles.map(role=><button type="button" key={role.id} onClick={()=>setProfile({...current,data:{...data,targetRoles:data.targetRoles.filter(item=>item.id!==role.id).map((item,index)=>({...item,priority:index+1}))}})}>{role.name||role.roleFamilyId} ×</button>)}</div><select defaultValue="" onChange={e=>{addRole(e.target.value);e.target.value=''}}><option value="">Agregar un rol…</option>{roles.map(role=><option key={role.id} value={role.id}>{role.name}</option>)}</select></fieldset><button className="primary">Guardar perfil</button></form>;
 }
 
 function CvView({ notify }: { notify:(value:string)=>void }) {

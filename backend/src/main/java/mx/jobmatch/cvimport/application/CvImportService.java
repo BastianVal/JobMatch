@@ -2,6 +2,7 @@ package mx.jobmatch.cvimport.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import mx.jobmatch.cvimport.domain.CvImportView;
+import mx.jobmatch.cvimport.domain.CvDocumentSummary;
 import mx.jobmatch.operations.application.BackgroundTaskPort;
 import mx.jobmatch.profile.application.ProfileService;
 import mx.jobmatch.profile.domain.ProfessionalProfile;
@@ -60,6 +61,9 @@ public class CvImportService {
 
     @Transactional(readOnly=true)
     public CvImportView get(UUID accountId,UUID importId){return imports.find(accountId,importId).orElseThrow(ImportNotFound::new);}
+
+    @Transactional(readOnly=true)
+    public List<CvDocumentSummary> listDocuments(UUID accountId){return imports.listDocuments(accountId);}
 
     @Transactional
     public CvImportView decide(UUID accountId,UUID importId,UUID candidateId,long version,String decision,String resolution){

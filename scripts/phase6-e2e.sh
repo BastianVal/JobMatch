@@ -40,7 +40,7 @@ profile_payload() {
   excluded="$1"
   printf '%s' '{
     "headline":"Backend engineer","summary":"Java APIs and PostgreSQL","location":"Ciudad de México","seniority":"SENIOR",
-    "targetRoles":[{"roleFamilyId":"11000000-0000-0000-0000-000000000001","priority":1}],
+    "targetRoles":[{"roleFamilyId":"11100000-0000-0000-0000-000000000011","priority":1}],
     "preferences":{"remoteMode":"ANY","employmentType":"ANY","currency":"MXN","willingToRelocate":false},
     "excludedEmployers":EXCLUDED,
     "trajectory":[

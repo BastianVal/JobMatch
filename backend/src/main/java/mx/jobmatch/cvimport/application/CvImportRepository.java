@@ -1,6 +1,7 @@
 package mx.jobmatch.cvimport.application;
 
 import mx.jobmatch.cvimport.domain.CvImportView;
+import mx.jobmatch.cvimport.domain.CvDocumentSummary;
 import mx.jobmatch.cvimport.domain.ImportProposal;
 
 import java.time.Instant;
@@ -12,6 +13,7 @@ public interface CvImportRepository {
     CvImportView create(UUID accountId, String originalFilename, CvStoragePort.StoredFile file,
                         long profileBaseVersion, Instant expiresAt, String extractorVersion);
     Optional<CvImportView> find(UUID accountId, UUID importId);
+    List<CvDocumentSummary> listDocuments(UUID accountId);
     Optional<ExtractionInput> startExtraction(UUID importId);
     void completeExtraction(UUID importId, String textHash, List<ImportProposal> proposals);
     void failExtraction(UUID importId, String safeErrorCode);

@@ -6,6 +6,7 @@ import mx.jobmatch.cvimport.application.CvImportExceptions.*;
 import mx.jobmatch.cvimport.application.CvImportRepository;
 import mx.jobmatch.cvimport.application.CvStoragePort;
 import mx.jobmatch.cvimport.domain.CvImportView;
+import mx.jobmatch.cvimport.domain.CvDocumentSummary;
 import mx.jobmatch.cvimport.domain.ImportProposal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -77,6 +78,22 @@ public class JdbcCvImportAdapter implements CvImportRepository {
                 rs.getString("status"),rs.getLong("profile_base_version"),rs.getString("extractor_version"),
                 rs.getString("safe_error_code"),rs.getTimestamp("expires_at").toInstant(),
                 nullableLong(rs,"confirmed_profile_version"))).optional().map(this::hydrate);
+    }
+
+    @Override
+    public List<CvDocumentSummary> listDocuments(UUID accountId) {
+        return jdbc.sql("""
+                SELECT document.public_id, document.original_filename, document.created_at,
+                       (SELECT run.status FROM cvimport.import_run run
+                        WHERE run.cv_document_id=document.id ORDER BY run.created_at DESC, run.id DESC LIMIT 1) latest_status
+                FROM cvimport.cv_document document
+                JOIN iam.account account ON account.id=document.account_id
+                WHERE account.public_id=:accountId AND account.status='ACTIVE' AND document.status='ACTIVE'
+                ORDER BY document.created_at DESC, document.id DESC
+                LIMIT 5
+                """).param("accountId", accountId).query((rs, row) -> new CvDocumentSummary(
+                rs.getObject("public_id", UUID.class), rs.getString("original_filename"),
+                rs.getTimestamp("created_at").toInstant(), rs.getString("latest_status"))).list();
     }
 
     @Override

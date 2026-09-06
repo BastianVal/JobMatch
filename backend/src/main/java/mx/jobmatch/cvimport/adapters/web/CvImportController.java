@@ -2,6 +2,7 @@ package mx.jobmatch.cvimport.adapters.web;
 
 import mx.jobmatch.cvimport.application.CvImportService;
 import mx.jobmatch.cvimport.domain.CvImportView;
+import mx.jobmatch.cvimport.domain.CvDocumentSummary;
 import mx.jobmatch.identity.adapters.security.AccountPrincipal;
 import mx.jobmatch.profile.domain.ProfessionalProfile;
 import org.springframework.context.annotation.Profile;
@@ -14,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
 import java.util.UUID;
+import java.util.List;
 
 import static mx.jobmatch.cvimport.application.CvImportExceptions.InvalidFile;
 
@@ -35,6 +37,11 @@ public class CvImportController {
 
     @GetMapping("/cv-imports/{id}")
     CvImportView get(@AuthenticationPrincipal AccountPrincipal principal,@PathVariable UUID id){return imports.get(principal.accountId(),id);}
+
+    @GetMapping("/cv-documents")
+    List<CvDocumentSummary> documents(@AuthenticationPrincipal AccountPrincipal principal){
+        return imports.listDocuments(principal.accountId());
+    }
 
     @PutMapping("/cv-imports/{id}/candidates/{candidateId}")
     ResponseEntity<CvImportView> decide(@AuthenticationPrincipal AccountPrincipal principal,@PathVariable UUID id,
