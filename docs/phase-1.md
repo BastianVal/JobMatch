@@ -29,6 +29,16 @@ curl -b cookies.txt -X POST http://localhost:8090/api/v1/auth/register \
 
 El worker enviará el mensaje a Mailpit. El enlace verifica la cuenta con `POST /api/v1/auth/verify-email`; el mismo patrón aplica a `password/forgot` y `password/reset`. Después de verificar, `POST /api/v1/auth/login` crea la sesión y `GET /api/v1/me/account` devuelve únicamente su propietario.
 
+### Verificación manual en el entorno local
+
+Mailpit está disponible únicamente en el equipo local en <http://127.0.0.1:8025>. Después de crear una cuenta desde la aplicación:
+
+1. Abre Mailpit y selecciona el mensaje dirigido al correo registrado.
+2. Abre el enlace `Verifica tu correo` incluido en el cuerpo del mensaje.
+3. En JobMatch, pulsa `Verificar correo` y luego inicia sesión.
+
+El correo no necesita existir: Mailpit captura localmente cualquier dirección y no entrega mensajes a Internet. Usa una dirección distinta para cada prueba, por ejemplo `prueba-001@example.com`. Registrar de nuevo una dirección que ya existe no genera otro mensaje de verificación.
+
 ## Evidencia automatizada
 
 - `TokenCodecTest`: firma por propósito, manipulación y hash no reversible.

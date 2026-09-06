@@ -86,12 +86,14 @@ services:
   mailpit:
     image: axllent/mailpit:v1.27
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_HTTP_PORT:-8025}:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 5s
       timeout: 3s
       retries: 10
-    networks: [private]
+    networks: [edge, private]
 
   frontend:
     build:
