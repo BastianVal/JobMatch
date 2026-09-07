@@ -74,7 +74,7 @@ status="$(put_tracking 4 ACCEPTED accepted)";test "$status" = 200;grep -q '"vers
 curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/me/tracking?state=ACCEPTED&limit=10" > "$body"
 grep -q "\"id\":\"$tracking\"" "$body";grep -q '"resultingVersion":5' "$body"
 curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/me/tracking?limit=10" > "$body"
-grep -q "\"id\":\"$tracking\"" "$body"
+if grep -q "\"id\":\"$tracking\"" "$body";then echo 'default tracking filter leaked an unselected state';exit 1;fi
 status="$(put_tracking 5 SAVED terminal)";test "$status" = 409;grep -q 'INVALID_TRACKING_TRANSITION' "$body"
 
 status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X DELETE -H "X-CSRF-TOKEN: $csrf" "$base/api/v1/me/account")"

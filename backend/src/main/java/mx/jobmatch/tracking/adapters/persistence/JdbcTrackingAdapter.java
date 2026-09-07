@@ -74,8 +74,7 @@ public class JdbcTrackingAdapter implements TrackingRepository {
     }
 
     @Override
-    public List<TrackedJob> list(UUID accountId, TrackingState state, int limit) {
-        String stateFilter = state == null ? " " : " AND tracked.state=:state ";
+    public List<TrackedJob> list(UUID accountId, List<TrackingState> states, int limit) {
         JdbcClient.StatementSpec statement = jdbc.sql("""
                 SELECT tracked.id internal_id, tracked.public_id, job.public_id job_id, job.title,
                   employer.canonical_name employer, tracked.state, tracked.note, tracked.version, tracked.updated_at
@@ -83,10 +82,10 @@ public class JdbcTrackingAdapter implements TrackingRepository {
                 JOIN jobs.canonical_job job ON job.id=tracked.canonical_job_id
                 JOIN jobs.employer employer ON employer.id=job.employer_id
                 WHERE account.public_id=:account
-                """ + stateFilter + """
+                  AND tracked.state IN (:states)
                 ORDER BY tracked.updated_at DESC, tracked.id DESC LIMIT :limit
-                """).param("account", accountId).param("limit", limit);
-        if (state != null) statement = statement.param("state", state.name());
+                """).param("account", accountId).param("limit", limit)
+                .param("states", states.stream().map(TrackingState::name).toList());
         return statement.query(this::row).list().stream().map(this::hydrate).toList();
     }
 

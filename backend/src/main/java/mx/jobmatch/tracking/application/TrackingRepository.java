@@ -13,7 +13,7 @@ public interface TrackingRepository {
     List<JobActivity> activities(UUID accountId, List<UUID> jobIds);
     Optional<TrackedJob> find(UUID accountId, UUID jobId);
     Optional<TrackedJob> findById(UUID accountId, UUID trackingId);
-    List<TrackedJob> list(UUID accountId, TrackingState state, int limit);
+    List<TrackedJob> list(UUID accountId, List<TrackingState> states, int limit);
     TrackedJob create(UUID accountId, UUID jobId, TrackingState state, String note);
     Optional<TrackedJob> update(UUID accountId, UUID jobId, long expectedVersion,
                                 TrackingState fromState, TrackingState targetState, String note);

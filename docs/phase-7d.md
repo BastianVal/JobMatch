@@ -36,6 +36,10 @@ Los filtros que aceptan múltiples valores se repiten en la URL, por ejemplo:
 
 ## Verificación
 
+Los fixtures locales se distribuyen entre todas las familias de rol seleccionables. De esta manera, un perfil creado con el catálogo normalizado puede recibir recomendaciones durante las pruebas locales.
+
+En escritorio, el detalle seleccionado de **Explorar** se mantiene visible mientras se recorre la lista. Cuando el contenido del detalle es más largo que la pantalla, usa su propio desplazamiento.
+
 - Seis pruebas frontend y build TypeScript/Vite correctos usando Node de WSL.
 - 36 pruebas backend correctas.
 - `scripts/phase7-e2e.sh` valida búsqueda, detalle, búsqueda guardada, descarte

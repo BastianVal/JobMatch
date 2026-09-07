@@ -52,7 +52,7 @@ public class TrackingController {
 
     @GetMapping("/tracking")
     List<TrackedJob> list(@AuthenticationPrincipal AccountPrincipal principal,
-                          @RequestParam(required = false) TrackingState state,
+                          @RequestParam(required = false) List<TrackingState> state,
                           @RequestParam(defaultValue = "50") int limit) {
         return tracking.list(principal.accountId(), state, limit);
     }

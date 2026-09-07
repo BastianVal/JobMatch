@@ -52,9 +52,12 @@ public class TrackingService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrackedJob> list(UUID accountId, TrackingState state, int limit) {
+    public List<TrackedJob> list(UUID accountId, List<TrackingState> states, int limit) {
         if (limit < 1 || limit > 100) throw new InvalidTrackingRequest("El límite debe estar entre 1 y 100.");
-        return tracking.list(accountId, state, limit);
+        var selected = states == null || states.isEmpty()
+                ? List.of(TrackingState.APPLIED, TrackingState.INTERVIEW, TrackingState.REJECTED, TrackingState.WITHDRAWN)
+                : states.stream().filter(state -> state != TrackingState.DISCARDED).distinct().toList();
+        return selected.isEmpty() ? List.of() : tracking.list(accountId, selected, limit);
     }
 
     @Transactional

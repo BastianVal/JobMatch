@@ -3,17 +3,22 @@
 BEGIN;
 
 CREATE TEMP TABLE fixture_job ON COMMIT DROP AS
+WITH selectable_roles AS (
+    SELECT public_id AS role_public_id, slug AS role_slug, display_name AS role_name,
+           row_number() OVER (ORDER BY slug) AS role_no
+    FROM catalog.role_family
+    WHERE active AND selectable
+), role_count AS (
+    SELECT count(*) AS value FROM selectable_roles
+)
 SELECT series AS fixture_no,
        ((series - 1) % 200) + 1 AS employer_no,
-       ((series - 1) % 4) + 1 AS role_no,
+       role.role_no,
+       role.role_public_id,
+       role.role_slug,
        md5('job:' || series)::uuid AS job_public_id,
        'local-fixture-' || series AS identity_key,
-       CASE ((series - 1) % 4)
-         WHEN 0 THEN 'Desarrollador Backend Java'
-         WHEN 1 THEN 'Analista de Datos'
-         WHEN 2 THEN 'Ingeniero DevOps'
-         ELSE 'Product Manager'
-       END || ' ' || series AS title,
+       role.role_name || ' ' || series AS title,
        CASE ((series - 1) % 3) WHEN 0 THEN 'REMOTE' WHEN 1 THEN 'HYBRID' ELSE 'ONSITE' END AS remote_mode,
        CASE ((series - 1) % 4) WHEN 0 THEN 'FULL_TIME' WHEN 1 THEN 'CONTRACT'
             WHEN 2 THEN 'PART_TIME' ELSE 'INTERNSHIP' END AS employment_type,
@@ -26,7 +31,9 @@ SELECT series AS fixture_no,
             WHEN 2 THEN 'Monterrey' WHEN 3 THEN 'Querétaro' ELSE 'Puebla' END AS city_name,
        CASE ((series - 1) % 5) WHEN 0 THEN 'Ciudad de México' WHEN 1 THEN 'Jalisco'
             WHEN 2 THEN 'Nuevo León' WHEN 3 THEN 'Querétaro' ELSE 'Puebla' END AS state_name
-FROM generate_series(1, LEAST(:fixture_count::bigint, 1000000)) series;
+FROM generate_series(1, LEAST(:fixture_count::bigint, 1000000)) series
+CROSS JOIN role_count
+JOIN selectable_roles role ON role.role_no=((series - 1) % role_count.value) + 1;
 
 INSERT INTO jobs.employer(public_id, canonical_name, name_normalized)
 SELECT md5('employer:' || employer_no)::uuid,
@@ -40,11 +47,12 @@ INSERT INTO jobs.canonical_job(public_id, identity_key, employer_id, role_family
     published_at, expires_at, status)
 SELECT fixture.job_public_id, fixture.identity_key, employer.id,
        role.id, fixture.title, lower(unaccent(fixture.title)),
-       CASE fixture.role_no
-         WHEN 1 THEN 'Desarrollo de servicios backend con Java, Spring Boot, PostgreSQL y Git.'
-         WHEN 2 THEN 'Análisis de datos con Python, PostgreSQL y comunicación de resultados.'
-         WHEN 3 THEN 'Automatización de plataforma con Docker, Git y prácticas DevOps.'
-         ELSE 'Gestión de producto digital, priorización y colaboración con ingeniería.'
+       CASE
+         WHEN fixture.role_slug IN ('java-developer','backend-developer') THEN 'Desarrollo de servicios backend con Java, Spring Boot, PostgreSQL y Git.'
+         WHEN fixture.role_slug IN ('python-developer','data-scientist','data-analyst','data-engineer','machine-learning-engineer','ai-developer','business-intelligence-engineer') THEN 'Análisis de datos con Python, PostgreSQL y comunicación de resultados.'
+         WHEN fixture.role_slug IN ('devops-engineer','cloud-engineer','cloud-architect','sre-engineer','system-administrator') THEN 'Automatización de plataforma con Docker, Git y prácticas DevOps.'
+         WHEN fixture.role_slug IN ('frontend-developer','react-developer','angular-developer','vuejs-developer','mobile-developer','ios-developer','android-developer','flutter-developer','react-native-developer') THEN 'Construcción de interfaces accesibles y mantenibles para productos digitales.'
+         ELSE 'Colaboración en productos digitales, priorización y comunicación con equipos de ingeniería.'
        END,
        fixture.seniority, fixture.remote_mode, fixture.employment_type,
        fixture.salary_min, fixture.salary_max, 'MXN', fixture.published_at,
@@ -52,10 +60,9 @@ SELECT fixture.job_public_id, fixture.identity_key, employer.id,
 FROM fixture_job fixture
 JOIN jobs.employer employer ON employer.name_normalized=
     ('empresa fixture ' || lpad(fixture.employer_no::text, 3, '0'))::citext
-JOIN catalog.role_family role ON role.public_id=(
-    '11000000-0000-0000-0000-' || lpad(fixture.role_no::text, 12, '0'))::uuid
+JOIN catalog.role_family role ON role.public_id=fixture.role_public_id
 ON CONFLICT (identity_key) DO UPDATE SET
-    title=excluded.title, title_normalized=excluded.title_normalized, description=excluded.description,
+    role_family_id=excluded.role_family_id, title=excluded.title, title_normalized=excluded.title_normalized, description=excluded.description,
     seniority=excluded.seniority, remote_mode=excluded.remote_mode, employment_type=excluded.employment_type,
     salary_min_monthly=excluded.salary_min_monthly, salary_max_monthly=excluded.salary_max_monthly,
     published_at=excluded.published_at, expires_at=excluded.expires_at, status='ACTIVE',
@@ -92,10 +99,11 @@ ON CONFLICT (source_posting_id) DO UPDATE SET active=true, preferred=true;
 
 INSERT INTO jobs.job_requirement(public_id, canonical_job_id, requirement_text, category, mandatory, position)
 SELECT md5('requirement:' || fixture.fixture_no)::uuid, job.id,
-       CASE fixture.role_no WHEN 1 THEN 'Experiencia construyendo servicios backend.'
-            WHEN 2 THEN 'Capacidad para analizar y explicar datos.'
-            WHEN 3 THEN 'Experiencia automatizando infraestructura.'
-            ELSE 'Experiencia priorizando productos digitales.' END,
+       CASE
+            WHEN fixture.role_slug IN ('java-developer','backend-developer') THEN 'Experiencia construyendo servicios backend.'
+            WHEN fixture.role_slug IN ('python-developer','data-scientist','data-analyst','data-engineer','machine-learning-engineer','ai-developer','business-intelligence-engineer') THEN 'Capacidad para analizar y explicar datos.'
+            WHEN fixture.role_slug IN ('devops-engineer','cloud-engineer','cloud-architect','sre-engineer','system-administrator') THEN 'Experiencia automatizando infraestructura.'
+            ELSE 'Experiencia colaborando en productos digitales.' END,
        'EXPERIENCE', true, 1
 FROM fixture_job fixture JOIN jobs.canonical_job job ON job.identity_key=fixture.identity_key
 ON CONFLICT (public_id) DO UPDATE SET requirement_text=excluded.requirement_text;
@@ -105,12 +113,13 @@ SELECT md5('skill-requirement:' || fixture.fixture_no)::uuid, job.id, skill.id, 
        'Mencionada explícitamente en la descripción.'
 FROM fixture_job fixture
 JOIN jobs.canonical_job job ON job.identity_key=fixture.identity_key
-JOIN catalog.skill skill ON skill.public_id=(CASE fixture.role_no
-    WHEN 1 THEN '12000000-0000-0000-0000-000000000001'
-    WHEN 2 THEN '12000000-0000-0000-0000-000000000006'
-    WHEN 3 THEN '12000000-0000-0000-0000-000000000007'
+JOIN catalog.skill skill ON skill.public_id=(CASE
+    WHEN fixture.role_slug IN ('java-developer','backend-developer') THEN '12000000-0000-0000-0000-000000000001'
+    WHEN fixture.role_slug IN ('python-developer','data-scientist','data-analyst','data-engineer','machine-learning-engineer','ai-developer','business-intelligence-engineer') THEN '12000000-0000-0000-0000-000000000006'
+    WHEN fixture.role_slug IN ('devops-engineer','cloud-engineer','cloud-architect','sre-engineer','system-administrator') THEN '12000000-0000-0000-0000-000000000007'
+    WHEN fixture.role_slug IN ('frontend-developer','react-developer','angular-developer','vuejs-developer','mobile-developer','ios-developer','android-developer','flutter-developer','react-native-developer') THEN '12000000-0000-0000-0000-000000000004'
     ELSE '12000000-0000-0000-0000-000000000008' END)::uuid
-ON CONFLICT (public_id) DO UPDATE SET evidence_text=excluded.evidence_text;
+ON CONFLICT (public_id) DO UPDATE SET skill_id=excluded.skill_id, evidence_text=excluded.evidence_text;
 
 INSERT INTO jobs.job_search_document(canonical_job_id, role_family_id, country_code, state_normalized,
     city_normalized, remote_mode, employment_type, salary_max_monthly, search_vector, projected_job_version)
