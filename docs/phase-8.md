@@ -40,6 +40,16 @@ curl --fail https://"$APP_HOST"/actuator/health/readiness
 Después valida que una cuenta, una vacante y una relación de seguimiento estén
 presentes. Sólo entonces se debe volver a dirigir tráfico al servicio.
 
+Para ensayar el proceso local sin modificar la base principal, ejecuta:
+
+```sh
+./scripts/verify-backup-restore.sh
+```
+
+El script exporta la base actual, calcula su checksum y la restaura en un
+contenedor PostgreSQL temporal que se elimina al terminar. No sustituye el ensayo
+de una restauración de EC2, pero detecta que un dump deje de ser recuperable.
+
 ## Límites y health checks
 
 Antes de publicar, ajusta `POSTGRES_*`, `API_*` y `WORKER_*` al tamaño real de
@@ -116,6 +126,9 @@ mutación, CORS deshabilitado, secretos fuera de Git, TLS emitido por Caddy,
 headers CSP/HSTS y los límites de autenticación. También se debe ejecutar una
 eliminación de cuenta de prueba y verificar que ya no se pueda recuperar el
 perfil, sesiones, impresiones, seguimiento ni historial asociado.
+
+`scripts/phase1-e2e.sh` comprueba además que una cuenta eliminada no puede iniciar
+una nueva sesión con sus credenciales anteriores.
 
 ## Pendiente de las siguientes entregas de Fase 8
 

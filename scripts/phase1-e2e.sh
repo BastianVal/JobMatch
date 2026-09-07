@@ -105,4 +105,13 @@ test "$status" = '204'
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/me/account")"
 test "$status" = '401'
 
+# La cuenta eliminada no puede iniciar una sesión nueva, aun con las credenciales originales.
+csrf_json="$(curl -fsS -H "Host: $host_header" -c "$cookies" "$base_url/api/v1/auth/csrf")"
+csrf="$(printf '%s' "$csrf_json" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')"
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -c "$cookies" -X POST \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" \
+  --data "{\"email\":\"$email\",\"password\":\"$new_password\"}" \
+  "$base_url/api/v1/auth/login")"
+test "$status" = '401'
+
 printf 'phase1-e2e: OK (csrf, verify, fixation, session, recovery, revocation, ownership)\n'
