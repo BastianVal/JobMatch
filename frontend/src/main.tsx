@@ -17,6 +17,7 @@ type TrackingEvent = { id: string; fromState?: TrackingState; toState: TrackingS
 type TrackedJob = { id: string; jobId: string; title: string; employer: string; state: TrackingState; note?: string; version: number; updatedAt: string; history: TrackingEvent[] };
 type Match = { score: number; classification: string; reasons: { id: string; type: string; explanation: string; points: number }[] };
 type RecommendationFeed = { status:'UPDATING'|'READY'; profileVersion:number; generatedProfileVersion?:number; generatedAt?:string; items:Job[] };
+type Notice = { id:number; message:string };
 
 const stateLabel: Record<TrackingState, string> = { SAVED:'Guardada', DISCARDED:'Descartada', APPLIED:'Postulada', INTERVIEW:'Entrevista', OFFER:'Oferta', ACCEPTED:'Aceptada', REJECTED:'Rechazada', WITHDRAWN:'Retirada' };
 const transitions: Record<TrackingState, TrackingState[]> = { SAVED:['DISCARDED','APPLIED'], DISCARDED:['SAVED'], APPLIED:['INTERVIEW','REJECTED','WITHDRAWN'], INTERVIEW:['OFFER','REJECTED','WITHDRAWN'], OFFER:['ACCEPTED','REJECTED','WITHDRAWN'], ACCEPTED:[], REJECTED:[], WITHDRAWN:[] };
@@ -52,10 +53,13 @@ function Auth({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
 
 type View = 'recommendations'|'search'|'tracking'|'profile';
 function Workspace({ account, onLogout }: { account: Account; onLogout: () => void }) {
-  const [view, setView] = useState<View>('recommendations'); const [notice, setNotice] = useState('');
+  const [view, setView] = useState<View>('recommendations'); const [notice, setNotice] = useState<Notice>(); const noticeId=useRef(0);
+  const notify=(message:string)=>{const normalized=message.trim();if(normalized)setNotice({id:++noticeId.current,message:normalized});};
+  useEffect(()=>{if(!notice)return;const timer=window.setTimeout(()=>setNotice(undefined),5000);return()=>window.clearTimeout(timer);},[notice?.id]);
+  function navigate(next:View){setView(next);setNotice(undefined);}
   async function logout() { await api('/auth/logout', { method:'POST' }); resetCsrf(); onLogout(); }
   const titles: Record<View,string>={recommendations:'Recomendaciones',search:'Explorar vacantes',tracking:'Tu seguimiento',profile:'Perfil profesional'};
-  return <div className="app-shell"><aside><div><p className="eyebrow">JobMatch</p><h2>Hola</h2><small>{account.email}</small></div><nav>{([['recommendations','Para ti'],['search','Explorar'],['tracking','Seguimiento'],['profile','Perfil']] as [View,string][]).map(([id,label])=><button key={id} className={view===id?'active':''} onClick={()=>setView(id)}>{label}</button>)}</nav><button className="quiet" onClick={logout}>Cerrar sesión</button></aside><div className="workspace"><header><div><p className="eyebrow">Panel personal</p><h1>{titles[view]}</h1></div></header>{notice && <div className="toast" role="status">{notice}<button onClick={()=>setNotice('')}>×</button></div>}{view==='recommendations' && <JobsView notify={setNotice} />}{view==='search' && <ExploreView notify={setNotice} />}{view==='tracking' && <TrackingView notify={setNotice} />}{view==='profile' && <ProfileView notify={setNotice} />}</div></div>;
+  return <div className="app-shell"><aside><div><p className="eyebrow">JobMatch</p><h2>Hola</h2><small>{account.email}</small></div><nav>{([['recommendations','Para ti'],['search','Explorar'],['tracking','Seguimiento'],['profile','Perfil']] as [View,string][]).map(([id,label])=><button key={id} className={view===id?'active':''} onClick={()=>navigate(id)}>{label}</button>)}</nav><button className="quiet" onClick={logout}>Cerrar sesión</button></aside><div className="workspace"><header><div><p className="eyebrow">Panel personal</p><h1>{titles[view]}</h1></div></header>{notice && <div className="toast" role="status" aria-live="polite" aria-atomic="true"><span>{notice.message}</span><button type="button" aria-label="Cerrar notificación" onClick={()=>setNotice(undefined)}>×</button></div>}{view==='recommendations' && <JobsView notify={notify} />}{view==='search' && <ExploreView notify={notify} />}{view==='tracking' && <TrackingView notify={notify} />}{view==='profile' && <ProfileView notify={notify} />}</div></div>;
 }
 
 function JobsView({ notify }: { notify:(value:string)=>void }) {

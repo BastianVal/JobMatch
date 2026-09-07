@@ -11,6 +11,9 @@
 - SPA React responsiva con autenticación, recomendaciones, búsqueda, evidencia de matching, seguimiento y perfil manual.
 - Estados de carga, secciones vacías, reintento y recuperación de conflictos en el cliente.
 - Eliminación de cuenta incluye impresiones, seguimiento e historial.
+- Notificaciones únicas, accesibles y temporales: desaparecen automáticamente a los
+  cinco segundos, reinician el temporizador ante un mensaje nuevo y se descartan al
+  cambiar de sección.
 
 ## Máquina de estados
 
@@ -36,3 +39,5 @@ NEW ──> SAVED ──> DISCARDED ──> SAVED
 La migración `V11__tracking.sql` crea `tracking.job_impression`, `tracking.user_job` y `tracking.user_job_event`, con unicidad por cuenta/vacante e índices por estado y actividad reciente.
 
 `scripts/phase7-e2e.sh` cubre impresión, indicador de nueva, retry idempotente, colisión de clave, versión obsoleta, transición inválida, recorrido hasta estado terminal e historial reconstruible.
+
+La implementación de notificaciones está documentada en [`phase-7g.md`](phase-7g.md).
