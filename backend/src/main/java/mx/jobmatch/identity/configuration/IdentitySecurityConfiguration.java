@@ -49,7 +49,7 @@ public class IdentitySecurityConfiguration {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation(fixation -> fixation.migrateSession()))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**", "/api/v1/auth/csrf",
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus", "/api/v1/auth/csrf",
                                 "/api/v1/auth/register", "/api/v1/auth/verify-email",
                                 "/api/v1/auth/login", "/api/v1/auth/password/forgot",
                                 "/api/v1/auth/password/reset").permitAll()

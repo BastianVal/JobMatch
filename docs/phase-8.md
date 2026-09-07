@@ -92,10 +92,35 @@ Por defecto son 50 usuarios virtuales durante dos minutos y la prueba falla si e
 p95 de la búsqueda supera 500 ms o si hay 1% o más de errores. Después se revisan
 las consultas lentas con `EXPLAIN ANALYZE` antes de cambiar índices.
 
+## Métricas y alertas
+
+La API publica las métricas estándar de Spring y las siguientes métricas de
+operación en `/actuator/prometheus`:
+
+- `jobmatch_background_tasks` por estado (`pending`, `running`, `failed`).
+- `jobmatch_background_task_oldest_pending_seconds`.
+- `jobmatch_ingestion_sync_runs` por estado y
+  `jobmatch_ingestion_failed_sync_runs_24h`.
+
+El endpoint queda permitido sólo para el recolector interno. Caddy no tiene una
+ruta hacia él y no debe añadirse una. Configura alertas iniciales para readiness
+caído, tareas pendientes por más de 15 minutos, tareas fallidas sostenidas,
+sincronizaciones fallidas, disco por encima de 80% y un respaldo con más de 25
+horas de antigüedad. Las alertas deben incluir el enlace al runbook y evitar
+datos personales.
+
+## Revisión de seguridad antes de producción
+
+Antes de abrir tráfico se deben comprobar: cookie `__Host-` segura, CSRF en cada
+mutación, CORS deshabilitado, secretos fuera de Git, TLS emitido por Caddy,
+headers CSP/HSTS y los límites de autenticación. También se debe ejecutar una
+eliminación de cuenta de prueba y verificar que ya no se pueda recuperar el
+perfil, sesiones, impresiones, seguimiento ni historial asociado.
+
 ## Pendiente de las siguientes entregas de Fase 8
 
 1. Ejecutar la carga contra un staging con datos representativos y revisar índices
    con `EXPLAIN ANALYZE`.
-2. Métricas operativas de negocio, alertas y runbooks de fallas.
-3. Revisar OWASP, eliminación integral de cuenta y ensayar la restauración.
+2. Configurar un recolector privado y alertas con los umbrales descritos.
+3. Ensayar restauración y eliminación integral de cuenta en staging.
 4. Prueba de integración limitada con las APIs reales autorizadas, en staging.
