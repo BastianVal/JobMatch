@@ -28,7 +28,16 @@ public class JdbcJobSearchAdapter implements JobSearchRepository {
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("accountId", accountId);
         String relevance;
-        StringBuilder filters = new StringBuilder(" WHERE job.status='ACTIVE' ");
+        StringBuilder filters = new StringBuilder("""
+                WHERE job.status='ACTIVE'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM tracking.user_job tracked
+                    JOIN iam.account owner ON owner.id=tracked.account_id
+                    WHERE owner.public_id=:accountId
+                      AND tracked.canonical_job_id=job.id
+                      AND tracked.state='DISCARDED'
+                  )
+                """);
         if (criteria.query() == null) {
             relevance = "0.000000::numeric";
         } else {

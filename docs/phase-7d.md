@@ -1,0 +1,43 @@
+# Fase 7D — Explorar y detalle de vacantes
+
+## Alcance entregado
+
+- “Explorar” incorpora filtros interactivos de texto, roles múltiples, modalidad,
+  tipo de empleo, país, estado, ciudad, salario mínimo, antigüedad y empresas
+  excluidas del perfil.
+- Las familias de roles se seleccionan únicamente desde el catálogo publicado;
+  admite hasta diez y consulta sugerencias después de dos caracteres.
+- Los filtros multivalor se envían como parámetros repetidos: OR dentro de cada
+  grupo y AND entre grupos, tal como aplica la consulta SQL.
+- Se pueden guardar búsquedas con nombre desde la misma pantalla.
+- La página se presenta como lista de hasta 25 vacantes a la izquierda y detalle a
+  la derecha. Se selecciona automáticamente la primera vacante de cada página.
+- El detalle incluye descripción, requisitos, habilidades, ubicación, salario,
+  fecha, fuentes y la acción para consultar evidencia de matching.
+- La paginación utiliza el cursor estable del backend. Sólo permite volver a páginas
+  ya visitadas o avanzar con el cursor siguiente; no muestra conteos inventados.
+- La consulta SQL excluye siempre trabajos `DISCARDED` del usuario autenticado y la
+  interfaz retira de inmediato una vacante al descartarla.
+
+## Contratos utilizados
+
+```http
+GET /api/v1/jobs/search
+GET /api/v1/jobs/{id}
+POST /api/v1/me/saved-searches
+GET /api/v1/me/saved-searches
+```
+
+Los filtros que aceptan múltiples valores se repiten en la URL, por ejemplo:
+
+```text
+/api/v1/jobs/search?roleFamilyId=<uuid>&roleFamilyId=<uuid>&remoteMode=REMOTE&remoteMode=HYBRID
+```
+
+## Verificación
+
+- Seis pruebas frontend y build TypeScript/Vite correctos usando Node de WSL.
+- 36 pruebas backend correctas.
+- `scripts/phase7-e2e.sh` valida búsqueda, detalle, búsqueda guardada, descarte
+  excluido de Explorar, impresiones, concurrencia y ciclo de seguimiento contra el
+  stack PostgreSQL real.

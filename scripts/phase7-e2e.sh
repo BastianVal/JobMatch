@@ -23,8 +23,23 @@ status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -
 status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -c "$cookies" -X POST \
   -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" --data "{\"email\":\"$email\",\"password\":\"$password\"}" "$base/api/v1/auth/login")";test "$status" = 204
 
-curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/search?limit=1" > "$body"
+# Explorar entrega página con detalle y permite persistir filtros sin modificar el perfil.
+curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/search?limit=25" > "$body"
 job="$(grep -o '"id":"[^"]*"' "$body"|head -1|cut -d '"' -f 4)";test -n "$job"
+discard_job="$(grep -o '"id":"[^"]*"' "$body"|sed -n '2p'|cut -d '"' -f 4)";test -n "$discard_job"
+curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/$job" > "$body"
+grep -q '"description"' "$body";grep -q '"requirements"' "$body";grep -q '"sourceLinks"' "$body"
+status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X POST \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" \
+  --data '{"name":"Backend remoto","criteria":{"query":"backend","roleFamilyIds":[],"remoteModes":["REMOTE"],"employmentTypes":[],"excludeEmployers":false}}' "$base/api/v1/me/saved-searches")"
+test "$status" = 201
+curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/me/saved-searches" > "$body";grep -q '"name":"Backend remoto"' "$body"
+status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X PUT \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "0"' -H "Idempotency-Key: discard-discovery-$email" \
+  --data '{"state":"DISCARDED"}' "$base/api/v1/me/jobs/$discard_job/tracking")"
+test "$status" = 200
+curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/search?limit=25" > "$body"
+if grep -q "$discard_job" "$body";then echo 'discarded job leaked into discovery';exit 1;fi
 
 # NEW se deriva de impresiones; repetir un UUID en el lote no duplica filas.
 curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/me/job-activity?jobId=$job" > "$body";grep -q '"new":true' "$body"
@@ -64,4 +79,4 @@ status="$(put_tracking 5 SAVED terminal)";test "$status" = 409;grep -q 'INVALID_
 
 status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X DELETE -H "X-CSRF-TOKEN: $csrf" "$base/api/v1/me/account")"
 test "$status" = 204
-printf 'phase7-e2e: OK (impressions, NEW, idempotency, optimistic locking, lifecycle, history)\n'
+printf 'phase7-e2e: OK (discovery detail, saved searches, discarded exclusion, impressions, lifecycle, history)\n'
