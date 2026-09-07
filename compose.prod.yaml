@@ -1,20 +1,30 @@
+name: jobmatch
+
 services:
   postgres:
     volumes:
       - /srv/jobmatch/postgres:/var/lib/postgresql/data
+    cpus: ${POSTGRES_CPUS:-2.0}
+    mem_limit: ${POSTGRES_MEMORY_LIMIT:-2g}
   api:
-    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
-    build: null
+    image: ${JOBMATCH_BACKEND_IMAGE:?set JOBMATCH_BACKEND_IMAGE}:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: !reset null
+    cpus: ${API_CPUS:-1.0}
+    mem_limit: ${API_MEMORY_LIMIT:-1024m}
     environment:
+      JAVA_TOOL_OPTIONS: ${API_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError}
       SESSION_COOKIE_NAME: __Host-jobmatch_session
       SESSION_COOKIE_SECURE: "true"
       TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET}
       RATE_LIMIT_PEPPER: ${RATE_LIMIT_PEPPER:?set RATE_LIMIT_PEPPER}
       PUBLIC_BASE_URL: https://${APP_HOST:?set APP_HOST}
   worker:
-    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
-    build: null
+    image: ${JOBMATCH_BACKEND_IMAGE:?set JOBMATCH_BACKEND_IMAGE}:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: !reset null
+    cpus: ${WORKER_CPUS:-1.0}
+    mem_limit: ${WORKER_MEMORY_LIMIT:-768m}
     environment:
+      JAVA_TOOL_OPTIONS: ${WORKER_JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError}
       SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:?set SMTP_USERNAME}
@@ -24,8 +34,11 @@ services:
       TOKEN_SECRET: ${TOKEN_SECRET:?set TOKEN_SECRET}
       PUBLIC_BASE_URL: https://${APP_HOST:?set APP_HOST}
   migrate:
-    image: ghcr.io/example/jobmatch:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
-    build: null
+    image: ${JOBMATCH_BACKEND_IMAGE:?set JOBMATCH_BACKEND_IMAGE}:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: !reset null
+  frontend:
+    image: ${JOBMATCH_FRONTEND_IMAGE:?set JOBMATCH_FRONTEND_IMAGE}:${JOBMATCH_IMAGE_TAG:?set JOBMATCH_IMAGE_TAG}
+    build: !reset null
   caddy:
     ports: !override
       - "80:80"
