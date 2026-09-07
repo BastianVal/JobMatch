@@ -30,13 +30,25 @@ class DeterministicScoringV1Test {
         assertThat(result.reasons()).anySatisfy(reason->{
             assertThat(reason.type()).isEqualTo("MATCH");
             assertThat(reason.requirement()).containsEntry("skillId",JAVA);
-            assertThat(reason.evidence()).containsKeys("profileSkillId","professionalMonths","trajectoryIds");
+            assertThat(reason.evidence()).containsKeys("skill","professionalMonths","trajectoryIds");
         }).anySatisfy(reason->{
             assertThat(reason.type()).isEqualTo("GAP");
             assertThat(reason.requirement()).containsEntry("skillId",POSTGRES);
             assertThat(reason.evidence()).isEmpty();
         });
         assertThat(scoring.evaluate(profile,job("MID"),facts).score()).isEqualByComparingTo(result.score());
+    }
+
+    @Test void combinesMissingSkillPriorityConsiderationsIntoOneClearReason(){
+        var result=scoring.evaluate(profile("SENIOR",36),job("MID"),
+                new JobFacts(ROLE,"MID",null,List.of(skill(JAVA,"Java","REQUIRED")),List.of(),List.of()));
+
+        assertThat(result.reasons().stream().filter(reason->reason.component().equals("TECHNOLOGIES_KNOWLEDGE"))
+                .filter(reason->reason.type().equals("CONSIDERATION")).filter(reason->reason.explanation().contains("no especifica")))
+                .singleElement().satisfies(reason->{
+                    assertThat(reason.explanation()).contains("deseables", "relacionadas con responsabilidades");
+                    assertThat(reason.requirement()).containsKey("unspecifiedPriorities");
+                });
     }
 
     @Test void juniorAgainstSeniorIsCappedUnlessProfessionalRequirementIsMet(){

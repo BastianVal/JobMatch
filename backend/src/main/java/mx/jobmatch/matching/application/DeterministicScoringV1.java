@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Component
 public class DeterministicScoringV1 {
-    public static final String VERSION="score-1";
+    public static final String VERSION="score-2";
 
     public MatchEvaluation evaluate(ProfessionalProfile profile,JobDetail job,JobFacts facts){
         var reasons=new ArrayList<MatchEvaluation.Reason>();
@@ -50,8 +50,9 @@ public class DeterministicScoringV1 {
         }
         var target=profile.targetRoles().stream().filter(role->role.roleFamilyId().equals(facts.roleFamilyId())).findFirst();
         if(target.isPresent()){
-            reason(reasons,"ROLE_RESPONSIBILITIES","MATCH",null,map("roleFamilyId",facts.roleFamilyId()),
-                    map("targetRoleId",target.get().id(),"priority",target.get().priority()),25,"La vacante coincide con un rol objetivo.");return 25;
+            reason(reasons,"ROLE_RESPONSIBILITIES","MATCH",null,map("role",target.get().name()),
+                    map("targetRole",target.get().name(),"priority",target.get().priority()),25,
+                    "La vacante coincide con tu rol objetivo: "+target.get().name()+".");return 25;
         }
         reason(reasons,"ROLE_RESPONSIBILITIES","GAP",null,map("roleFamilyId",facts.roleFamilyId()),
                 map("targetRoleIds",profile.targetRoles().stream().map(ProfileDraft.TargetRole::roleFamilyId).toList()),0,
@@ -66,6 +67,12 @@ public class DeterministicScoringV1 {
         total+=skillGroup("REQUIRED",17.5,facts.skills(),owned,reasons);
         total+=skillGroup("DESIRED",5.0,facts.skills(),owned,reasons);
         total+=skillGroup("RESPONSIBILITY",2.5,facts.skills(),owned,reasons);
+        List<String> unspecifiedPriorities=List.of("REQUIRED","DESIRED","RESPONSIBILITY").stream()
+                .filter(priority->facts.skills().stream().noneMatch(skill->skill.priority().equals(priority)))
+                .map(DeterministicScoringV1::priorityLabel).toList();
+        if(!unspecifiedPriorities.isEmpty())reason(reasons,"TECHNOLOGIES_KNOWLEDGE","CONSIDERATION",null,
+                map("unspecifiedPriorities",unspecifiedPriorities),Map.of(),0,
+                "La vacante no especifica habilidades "+String.join(", ",unspecifiedPriorities)+"; esa parte se estimó con información parcial.");
         for(var required:facts.skills())if(required.priority().equals("REQUIRED")&&!owned.containsKey(required.skillId()))mandatoryGap=true;
         Map<String,ProfileDraft.Language> languages=new HashMap<>();profile.languages().forEach(language->languages.put(language.code(),language));
         for(var required:facts.languages()){
@@ -73,8 +80,8 @@ public class DeterministicScoringV1 {
             if(required.mandatory()&&!match)mandatoryGap=true;
             reason(reasons,"TECHNOLOGIES_KNOWLEDGE",match?"MATCH":required.mandatory()?"GAP":"CONSIDERATION",required.requirementId(),
                     map("language",required.code(),"mandatory",required.mandatory(),"text",required.evidenceText()),
-                    match?map("languageId",evidence.id(),"proficiency",evidence.proficiency()):Map.of(),0,
-                    match?"El perfil contiene el idioma solicitado.":"No hay evidencia del idioma mencionado.");
+                    match?map("language",required.name(),"proficiency",evidence.proficiency()):Map.of(),0,
+                    match?"Tu perfil incluye el idioma solicitado: "+required.name()+".":"No hay evidencia del idioma solicitado: "+required.name()+".");
         }
         return new Technical(total,mandatoryGap);
     }
@@ -82,19 +89,16 @@ public class DeterministicScoringV1 {
     private double skillGroup(String priority,double maximum,List<JobFacts.SkillRequirement> requirements,
                               Map<UUID,ProfileDraft.Skill> owned,List<MatchEvaluation.Reason> reasons){
         var group=requirements.stream().filter(item->item.priority().equals(priority)).toList();
-        if(group.isEmpty()){
-            reason(reasons,"TECHNOLOGIES_KNOWLEDGE","CONSIDERATION",null,map("priority",priority),Map.of(),maximum/2,
-                    "La vacante no declara habilidades de esta prioridad.");return maximum/2;
-        }
+        if(group.isEmpty()) return maximum/2;
         double each=maximum/group.size(),points=0;
         for(var requirement:group){
             var evidence=owned.get(requirement.skillId());boolean match=evidence!=null;
             if(match)points+=each;
             reason(reasons,"TECHNOLOGIES_KNOWLEDGE",match?"MATCH":"GAP",requirement.requirementId(),
                     map("skillId",requirement.skillId(),"skill",requirement.skill(),"priority",priority,"text",requirement.evidenceText()),
-                    match?map("profileSkillId",evidence.id(),"professionalMonths",evidence.professionalMonths(),
+                    match?map("skill",requirement.skill(),"professionalMonths",evidence.professionalMonths(),
                             "weightedPracticalMonths",evidence.weightedPracticalMonths(),"trajectoryIds",evidence.evidenceTrajectoryIds()):Map.of(),
-                    match?each:0,match?"Existe evidencia concreta de la habilidad.":"No existe evidencia de la habilidad en el perfil.");
+                    match?each:0,match?"Tu perfil incluye la habilidad solicitada: "+requirement.skill()+".":"No encontramos "+requirement.skill()+" entre las habilidades registradas en tu perfil.");
         }
         return points;
     }
@@ -117,7 +121,7 @@ public class DeterministicScoringV1 {
         double duration=Math.min(10,10*coverage);boolean below=coverage<0.70;boolean satisfied=coverage>=1;
         reason(reasons,"SENIORITY_EXPERIENCE",satisfied?"MATCH":"GAP",null,map("professionalMonthsRequired",facts.professionalMonths()),
                 map("professionalMonths",professional,"coverage",decimal(coverage)),duration,
-                satisfied?"La experiencia profesional cubre el mínimo.":"La experiencia profesional no cubre el mínimo declarado.");
+                satisfied?"La experiencia profesional registrada cubre el mínimo.":"La experiencia profesional registrada no cubre el mínimo declarado.");
         return new Experience(seniority+duration,below,satisfied);
     }
 
@@ -138,7 +142,7 @@ public class DeterministicScoringV1 {
     private double solidity(ProfileDraft profile,JobDetail job,List<MatchEvaluation.Reason> reasons){
         int professional=months(profile.trajectory(),true,reference(job));double points=professional>=24?10:professional>=12?7:professional>0?4:0;
         reason(reasons,"EXPERIENCE_TYPE",professional>0?"MATCH":"GAP",null,map("measure","formal-employment-months"),
-                map("professionalMonths",professional),points,professional>0?"Hay experiencia en empleo formal.":"No hay experiencia de empleo formal.");return points;
+                map("professionalMonths",professional),points,professional>0?"Hay experiencia en empleo formal registrada.":"No hay experiencia de empleo formal registrada en el perfil.");return points;
     }
 
     private double preferences(ProfileDraft profile,JobDetail job,List<MatchEvaluation.Reason> reasons){
@@ -167,6 +171,7 @@ public class DeterministicScoringV1 {
     private static int level(String value){return switch(value){case "INTERN"->0;case "JUNIOR"->1;case "MID"->2;case "SENIOR"->3;case "LEAD"->4;case "MANAGER"->5;case "DIRECTOR"->6;default->0;};}
     private static String classification(double score){return score>=85?"EXCELLENT":score>=70?"STRONG":score>=50?"POSSIBLE":"LOW";}
     private static BigDecimal decimal(double value){return BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP);}
+    private static String priorityLabel(String priority){return switch(priority){case "REQUIRED"->"obligatorias";case "DESIRED"->"deseables";case "RESPONSIBILITY"->"relacionadas con responsabilidades";default->"sin clasificar";};}
     private static Map<String,Object> map(Object...values){Map<String,Object> result=new LinkedHashMap<>();for(int i=0;i<values.length;i+=2)result.put((String)values[i],values[i+1]);return result;}
     private static void reason(List<MatchEvaluation.Reason> reasons,String component,String type,UUID requirementId,
                                Map<String,Object> requirement,Map<String,Object> evidence,double points,String explanation){
