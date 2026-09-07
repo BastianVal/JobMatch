@@ -50,6 +50,14 @@ public class TrackingController {
                 version(ifMatch), idempotencyKey));
     }
 
+    @DeleteMapping("/jobs/{jobId}/tracking")
+    ResponseEntity<Void> allowRecommendation(@AuthenticationPrincipal AccountPrincipal principal,
+                                              @PathVariable UUID jobId,
+                                              @RequestHeader("If-Match") String ifMatch) {
+        tracking.allowRecommendation(principal.accountId(), jobId, version(ifMatch));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/tracking")
     List<TrackedJob> list(@AuthenticationPrincipal AccountPrincipal principal,
                           @RequestParam(required = false) List<TrackingState> state,

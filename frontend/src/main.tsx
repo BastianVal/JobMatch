@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, errorMessage, resetCsrf } from './api';
 import { ProfileView } from './profile';
+import { publicationLabel } from './publication';
 import './styles.css';
 
 type Account = { id: string; email: string; status: string };
@@ -21,6 +22,7 @@ type Notice = { id:number; message:string };
 
 const stateLabel: Record<TrackingState, string> = { SAVED:'Guardada', DISCARDED:'Descartada', APPLIED:'Postulada', INTERVIEW:'Entrevista', OFFER:'Oferta', ACCEPTED:'Aceptada', REJECTED:'Rechazada', WITHDRAWN:'Retirada' };
 const transitions: Record<TrackingState, TrackingState[]> = { SAVED:['DISCARDED','APPLIED'], DISCARDED:['SAVED'], APPLIED:['INTERVIEW','REJECTED','WITHDRAWN'], INTERVIEW:['OFFER','REJECTED','WITHDRAWN'], OFFER:['ACCEPTED','REJECTED','WITHDRAWN'], ACCEPTED:[], REJECTED:[], WITHDRAWN:[] };
+const explorationActionLabel: Partial<Record<TrackingState, string>> = { SAVED:'Guardar', APPLIED:'Postulada', DISCARDED:'Descartar' };
 
 function App() {
   const [account, setAccount] = useState<Account | null | undefined>();
@@ -167,10 +169,16 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
     try {
       const tracked=await api<TrackedJob>(`/me/jobs/${jobId}/tracking`,{method:'PUT',headers:{'If-Match':String(current?.version||0),'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({state})});
       setActivity(values=>({...values,[jobId]:{...values[jobId],jobId,new:false,trackingId:tracked.id,state:tracked.state,version:tracked.version,note:tracked.note}}));
-      if(state==='DISCARDED'){
-        const remaining=jobs.filter(job=>job.id!==jobId);setPages(all=>all.map((page,index)=>index===pageIndex?{...page,items:remaining}:page));setSelectedId(remaining[0]?.id);setDetail(undefined);
-      }
       notify(`Vacante actualizada: ${stateLabel[state]}.`);
+    } catch(failure){if(failure instanceof ApiError&&failure.problem.code==='VERSION_CONFLICT')await populateActivity(jobs);notify(errorMessage(failure));}
+  }
+  async function allowRecommendation(jobId:string){
+    const current=activity[jobId];
+    if(!current?.trackingId || current.state!=='DISCARDED' || current.version==null)return;
+    try {
+      await api(`/me/jobs/${jobId}/tracking`,{method:'DELETE',headers:{'If-Match':String(current.version)}});
+      setActivity(values=>({...values,[jobId]:{...values[jobId],jobId,new:false,trackingId:undefined,state:undefined,version:undefined,note:undefined}}));
+      notify('La vacante podrá volver a recomendarse.');
     } catch(failure){if(failure instanceof ApiError&&failure.problem.code==='VERSION_CONFLICT')await populateActivity(jobs);notify(errorMessage(failure));}
   }
   async function saveSearch(){
@@ -200,8 +208,8 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
       </div></details>
     </form>{saveDialogOpen&&<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setSaveDialogOpen(false)}}><form className="save-search-dialog" role="dialog" aria-modal="true" aria-labelledby="save-search-title" onSubmit={event=>{event.preventDefault();void saveSearch()}}><div className="modal-head"><h2 id="save-search-title">Guardar búsqueda</h2><button type="button" className="quiet modal-close" aria-label="Cerrar" onClick={()=>setSaveDialogOpen(false)}>×</button></div><p>Guarda el texto y todos los filtros seleccionados para reutilizarlos después.</p><label>Nombre de la búsqueda<input autoFocus value={saveName} maxLength={120} onChange={event=>setSaveName(event.target.value)} placeholder="Ej. Backend remoto México" required/></label><div className="actions"><button type="button" className="quiet" onClick={()=>setSaveDialogOpen(false)}>Cancelar</button><button className="primary">Guardar búsqueda</button></div></form></div>}
     {loading?<Loading label="Buscando vacantes"/>:error?<Retry message={error} onRetry={()=>void search()}/>:!jobs.length?<Empty title="No encontramos vacantes" detail="Prueba con menos filtros o términos más amplios."/>:<div className="explore-workspace">
-      <div className="job-stack"><div className="job-stack-head"><strong>{jobs.length} vacantes</strong><span>Página {pageIndex+1}</span></div>{jobs.map(job=><button type="button" key={job.id} className={`job-row ${selectedId===job.id?'selected':''}`} onClick={()=>setSelectedId(job.id)}><span>{job.employer}</span><strong>{job.title}</strong><small>{jobFacts(job)}</small></button>)}<div className="pagination"><button type="button" disabled={pageIndex===0} onClick={()=>{const previous=pages[pageIndex-1];if(previous){void populateActivity(previous.items);setSelectedId(previous.items[0]?.id);}setPageIndex(index=>index-1);}}>Anterior</button><span>{pageIndex+1}</span><button type="button" disabled={!currentPage?.nextCursor} onClick={()=>void search(filters,currentPage?.nextCursor,true)}>Siguiente</button></div></div>
-      <ExploreDetail detail={detail} loading={detailLoading} activity={selectedActivity} onTransition={state=>{if(selectedId)void transition(selectedId,state);}} notify={notify}/>
+      <div className="job-stack"><div className="job-stack-head"><strong>{jobs.length} vacantes</strong><span>Página {pageIndex+1}</span></div>{jobs.map(job=>{const rowActivity=job.id?activity[job.id]:undefined;const status=rowActivity?.state==='SAVED'?'Guardado':rowActivity?.state==='APPLIED'?'Postulado':rowActivity?.state==='DISCARDED'?'Descartado':selectedId===job.id?'Vista':'';return <button type="button" key={job.id} className={`job-row ${selectedId===job.id?'selected':''}`} onClick={()=>setSelectedId(job.id)}><span>{job.employer}</span><strong>{job.title}</strong><small>{jobFacts(job)}</small><div className="job-row-footer"><time>{publicationLabel(job.publishedAt)}</time>{status&&<span className={`job-row-status ${rowActivity?.state ? `job-row-status-${rowActivity.state.toLowerCase()}` : 'job-row-status-viewed'}`}>{status}</span>}</div></button>})}<div className="pagination"><button type="button" disabled={pageIndex===0} onClick={()=>{const previous=pages[pageIndex-1];if(previous){void populateActivity(previous.items);setSelectedId(previous.items[0]?.id);}setPageIndex(index=>index-1);}}>Anterior</button><span>{pageIndex+1}</span><button type="button" disabled={!currentPage?.nextCursor} onClick={()=>void search(filters,currentPage?.nextCursor,true)}>Siguiente</button></div></div>
+      <ExploreDetail detail={detail} loading={detailLoading} activity={selectedActivity} onTransition={state=>{if(selectedId)void transition(selectedId,state);}} onAllowRecommendation={()=>{if(selectedId)void allowRecommendation(selectedId);}}/>
     </div>}</section>;
 }
 
@@ -209,15 +217,14 @@ function FilterChoices({label,values,options,onToggle}:{label:string;values:stri
   return <fieldset className="choice-field"><legend>{label}</legend>{options.map(([value,name])=><label key={value}><input type="checkbox" checked={values.includes(value)} onChange={()=>onToggle(value)}/>{name}</label>)}</fieldset>;
 }
 
-function ExploreDetail({detail,loading,activity,onTransition,notify}:{detail?:JobDetail;loading:boolean;activity?:Activity;onTransition:(state:TrackingState)=>void;notify:(value:string)=>void}){
-  const [match,setMatch]=useState<Match>(); const [busy,setBusy]=useState(false);
-  useEffect(()=>setMatch(undefined),[detail?.id]);
+function ExploreDetail({detail,loading,activity,onTransition,onAllowRecommendation}:{detail?:JobDetail;loading:boolean;activity?:Activity;onTransition:(state:TrackingState)=>void;onAllowRecommendation:()=>void}){
+  const [match,setMatch]=useState<Match>();
+  useEffect(()=>{if(!detail?.id){setMatch(undefined);return;}let cancelled=false;setMatch(undefined);void api<Match>(`/jobs/${detail.id}/match`).then(result=>{if(!cancelled)setMatch(result);}).catch(()=>{if(!cancelled)setMatch(undefined);});return()=>{cancelled=true;};},[detail?.id]);
   if(loading)return <div className="job-detail"><Loading label="Cargando detalle"/></div>;
   if(!detail)return <div className="job-detail job-detail-empty"><Empty title="Selecciona una vacante" detail="Su descripción y requisitos aparecerán aquí."/></div>;
-  const available:TrackingState[]=activity?.state?transitions[activity.state]:['SAVED','DISCARDED','APPLIED'];
-  const detailId=detail.id;const salary=salaryText(detail);const location=detail.locations.map(item=>[item.city,item.state,item.countryCode].filter(Boolean).join(', ')).join(' · ');
-  async function inspect(){setBusy(true);try{setMatch(await api<Match>(`/jobs/${detailId}/match`));}catch(error){notify(errorMessage(error));}finally{setBusy(false);}}
-  return <article className="job-detail"><header><div><p className="eyebrow">{detail.employer}</p><h2>{detail.title}</h2><p className="job-facts">{[detail.roleFamily,detail.seniority,detail.remoteMode,detail.employmentType].filter(Boolean).join(' · ')}</p></div>{activity?.state&&<span className={`state state-${activity.state.toLowerCase()}`}>{stateLabel[activity.state]}</span>}</header><div className="detail-actions">{available.map(state=><button key={state} onClick={()=>onTransition(state)}>{stateLabel[state]}</button>)}<button className="quiet" disabled={busy} onClick={()=>void inspect()}>{busy?'Calculando…':'Ver evidencia'}</button></div><dl className="job-detail-facts"><div><dt>Ubicación</dt><dd>{location||'No especificada'}</dd></div><div><dt>Salario</dt><dd>{salary||'No especificado'}</dd></div><div><dt>Publicada</dt><dd>{new Date(detail.publishedAt).toLocaleDateString('es-MX')}</dd></div></dl><section><h3>Descripción</h3><p className="long-copy">{detail.description}</p></section>{detail.requirements.length>0&&<section><h3>Requisitos</h3><ul className="detail-list">{detail.requirements.map(item=><li key={item.id}>{item.text}{item.mandatory&&<strong> Obligatorio</strong>}</li>)}</ul></section>}{detail.skillRequirements.length>0&&<section><h3>Habilidades</h3><div className="read-chips">{detail.skillRequirements.map(item=><span key={item.id}>{item.skill}</span>)}</div></section>}{detail.sourceLinks.length>0&&<section><h3>Postularse</h3><div className="source-links">{detail.sourceLinks.map(link=><a key={link.postingId} href={link.url} target="_blank" rel="noreferrer">{link.source}{link.preferred?' · Principal':''}</a>)}</div></section>}{match&&<section className="match-detail"><strong>{Math.round(Number(match.score))}/100 · {match.classification}</strong><ul>{match.reasons.slice(0,5).map(reason=><li key={reason.id} className={reason.type.toLowerCase()}>{reason.explanation}</li>)}</ul></section>}</article>;
+  const available:TrackingState[]=activity?.state==='DISCARDED'?[]:activity?.state==='SAVED'?['APPLIED','DISCARDED']:activity?.state==='APPLIED'?[]:['SAVED','APPLIED','DISCARDED'];
+  const salary=salaryText(detail);const location=detail.locations.map(item=>[item.city,item.state,item.countryCode].filter(Boolean).join(', ')).join(' · ');
+  return <article className="job-detail"><header><div><p className="eyebrow">{detail.employer}</p><h2>{detail.title}</h2><p className="job-facts">{[detail.roleFamily,detail.seniority,detail.remoteMode,detail.employmentType].filter(Boolean).join(' · ')}</p></div>{activity?.state&&<span className={`state state-${activity.state.toLowerCase()}`}>{stateLabel[activity.state]}</span>}</header><div className="detail-actions">{activity?.state==='DISCARDED'?<button className="primary" onClick={onAllowRecommendation}>Permitir recomendar</button>:available.map(state=><button key={state} onClick={()=>onTransition(state)}>{explorationActionLabel[state]}</button>)}</div><dl className="job-detail-facts"><div><dt>Ubicación</dt><dd>{location||'No especificada'}</dd></div><div><dt>Salario</dt><dd>{salary||'No especificado'}</dd></div><div><dt>Publicada</dt><dd>{publicationLabel(detail.publishedAt)||'No especificada'}</dd></div></dl>{match&&<section className="match-detail"><h3>Compatibilidad</h3><strong>{Math.round(Number(match.score))}/100 · {match.classification}</strong><ul>{match.reasons.map(reason=><li key={reason.id} className={reason.type.toLowerCase()}>{reason.explanation}</li>)}</ul></section>}<section><h3>Descripción</h3><p className="long-copy">{detail.description}</p></section>{detail.requirements.length>0&&<section><h3>Requisitos</h3><ul className="detail-list">{detail.requirements.map(item=><li key={item.id}>{item.text}{item.mandatory&&<strong> Obligatorio</strong>}</li>)}</ul></section>}{detail.skillRequirements.length>0&&<section><h3>Habilidades</h3><div className="read-chips">{detail.skillRequirements.map(item=><span key={item.id}>{item.skill}</span>)}</div></section>}{detail.sourceLinks.length>0&&<section><h3>Postularse</h3><div className="source-links">{detail.sourceLinks.map(link=><a key={link.postingId} href={link.url} target="_blank" rel="noreferrer">{link.source}{link.preferred?' · Principal':''}</a>)}</div></section>}</article>;
 }
 
 function criteria(filters:SearchFilters){return {query:filters.query.trim()||null,roleFamilyIds:filters.roles.map(role=>role.id),remoteModes:filters.remoteModes,employmentTypes:filters.employmentTypes,countryCode:filters.countryCode.trim()||null,state:filters.state.trim()||null,city:filters.city.trim()||null,minimumMonthlySalary:filters.minimumMonthlySalary?Number(filters.minimumMonthlySalary):null,publishedWithinDays:filters.publishedWithinDays?Number(filters.publishedWithinDays):null,excludeEmployers:filters.excludeEmployers};}

@@ -17,5 +17,6 @@ public interface TrackingRepository {
     TrackedJob create(UUID accountId, UUID jobId, TrackingState state, String note);
     Optional<TrackedJob> update(UUID accountId, UUID jobId, long expectedVersion,
                                 TrackingState fromState, TrackingState targetState, String note);
+    boolean delete(UUID accountId, UUID jobId, long expectedVersion, TrackingState state);
     void deleteForAccount(UUID accountId);
 }

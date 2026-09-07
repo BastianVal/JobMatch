@@ -38,8 +38,14 @@ status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -
   -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "0"' -H "Idempotency-Key: discard-discovery-$email" \
   --data '{"state":"DISCARDED"}' "$base/api/v1/me/jobs/$discard_job/tracking")"
 test "$status" = 200
+discard_version="$(grep -o '"version":[0-9]*' "$body"|head -1|cut -d: -f2)";test "$discard_version" = 1
 curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/search?limit=25" > "$body"
 if grep -q "$discard_job" "$body";then echo 'discarded job leaked into discovery';exit 1;fi
+status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X DELETE \
+  -H "X-CSRF-TOKEN: $csrf" -H "If-Match: \"$discard_version\"" "$base/api/v1/me/jobs/$discard_job/tracking")"
+test "$status" = 204
+curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/jobs/search?limit=25" > "$body"
+grep -q "$discard_job" "$body"
 
 # NEW se deriva de impresiones; repetir un UUID en el lote no duplica filas.
 curl -fsS -H "Host: $host" -b "$cookies" "$base/api/v1/me/job-activity?jobId=$job" > "$body";grep -q '"new":true' "$body"
@@ -79,4 +85,4 @@ status="$(put_tracking 5 SAVED terminal)";test "$status" = 409;grep -q 'INVALID_
 
 status="$(curl -sS -o "$body" -w '%{http_code}' -H "Host: $host" -b "$cookies" -X DELETE -H "X-CSRF-TOKEN: $csrf" "$base/api/v1/me/account")"
 test "$status" = 204
-printf 'phase7-e2e: OK (discovery detail, saved searches, discarded exclusion, impressions, lifecycle, history)\n'
+printf 'phase7-e2e: OK (discovery detail, saved searches, discard reversal, impressions, lifecycle, history)\n'

@@ -127,6 +127,18 @@ public class JdbcTrackingAdapter implements TrackingRepository {
     }
 
     @Override
+    @Transactional
+    public boolean delete(UUID accountId, UUID jobId, long expectedVersion, TrackingState state) {
+        return jdbc.sql("""
+                DELETE FROM tracking.user_job tracked USING iam.account account, jobs.canonical_job job
+                WHERE tracked.account_id=account.id AND tracked.canonical_job_id=job.id
+                  AND account.public_id=:account AND job.public_id=:job
+                  AND tracked.version=:version AND tracked.state=:state
+                """).param("account", accountId).param("job", jobId).param("version", expectedVersion)
+                .param("state", state.name()).update() == 1;
+    }
+
+    @Override
     public void deleteForAccount(UUID accountId) {
         jdbc.sql("""
                 DELETE FROM tracking.job_impression impression USING iam.account account

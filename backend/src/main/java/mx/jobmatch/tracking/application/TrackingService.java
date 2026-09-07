@@ -94,6 +94,17 @@ public class TrackingService {
         }
     }
 
+    @Transactional
+    public void allowRecommendation(UUID accountId, UUID jobId, long expectedVersion) {
+        if (expectedVersion < 1) throw new InvalidTrackingRequest("If-Match no es válido.");
+        TrackedJob current = tracking.find(accountId, jobId).orElseThrow(ResourceNotFound::new);
+        if (current.version() != expectedVersion) throw new VersionConflict();
+        if (current.state() != TrackingState.DISCARDED) {
+            throw new InvalidTransition("Sólo se puede permitir recomendar una vacante descartada.");
+        }
+        if (!tracking.delete(accountId, jobId, expectedVersion, TrackingState.DISCARDED)) throw new VersionConflict();
+    }
+
     private static void validate(TrackingState target, String note, long version, String key) {
         if (target == null) throw new InvalidTrackingRequest("El estado es obligatorio.");
         if (version < 0) throw new InvalidTrackingRequest("If-Match no es válido.");
