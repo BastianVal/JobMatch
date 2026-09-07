@@ -7,8 +7,11 @@ import mx.jobmatch.identity.adapters.security.AccountPrincipal;
 import mx.jobmatch.profile.domain.ProfessionalProfile;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +44,16 @@ public class CvImportController {
     @GetMapping("/cv-documents")
     List<CvDocumentSummary> documents(@AuthenticationPrincipal AccountPrincipal principal){
         return imports.listDocuments(principal.accountId());
+    }
+
+    @GetMapping("/cv-documents/{id}/download")
+    ResponseEntity<FileSystemResource> download(@AuthenticationPrincipal AccountPrincipal principal,@PathVariable UUID id){
+        var file=imports.download(principal.accountId(),id);
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(file.mediaType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment()
+                        .filename(file.originalFilename(),java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .header(HttpHeaders.CACHE_CONTROL,"private, no-store")
+                .body(new FileSystemResource(file.path()));
     }
 
     @PutMapping("/cv-imports/{id}/candidates/{candidateId}")

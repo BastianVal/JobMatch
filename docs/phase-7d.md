@@ -9,9 +9,11 @@
   admite hasta diez y consulta sugerencias después de dos caracteres.
 - Los filtros multivalor se envían como parámetros repetidos: OR dentro de cada
   grupo y AND entre grupos, tal como aplica la consulta SQL.
-- Se pueden guardar búsquedas con nombre desde la misma pantalla. Las guardadas se
-  muestran como accesos reutilizables y permiten aplicar de nuevo todos sus filtros,
-  renombrarlas o eliminarlas.
+- El botón **Guardar** vive entre **Aplicar filtros** y **Limpiar**, evitando un
+  formulario permanente. Al enfocar la barra, las búsquedas guardadas aparecen como
+  sugerencias reutilizables y desaparecen al escribir o hacer clic fuera. Al aplicar
+  una, su nombre queda visible dentro de la barra mientras sus filtros reales se
+  conservan internamente. Desde las sugerencias también se pueden renombrar o eliminar.
 - La página se presenta como lista de hasta 25 vacantes a la izquierda y detalle a
   la derecha. Se selecciona automáticamente la primera vacante de cada página.
 - El detalle incluye descripción, requisitos, habilidades, ubicación, salario,

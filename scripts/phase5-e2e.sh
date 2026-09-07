@@ -77,7 +77,7 @@ upload_and_wait() {
     sleep 1
   done
   grep -q '"status":"READY"' "$body"
-  grep -q '"extractorVersion":"tika-3.3.2-rules-1"' "$body"
+  grep -q '"extractorVersion":"tika-3.3.2-rules-2"' "$body"
   test "$(grep -o '"decision":"PENDING"' "$body" | wc -l | tr -d ' ')" -ge '5'
 }
 
@@ -150,6 +150,12 @@ status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$coo
 test "$status" = '400'
 grep -q 'INVALID_CV_FILE' "$body"
 
+# El propietario puede descargar el archivo original antes de eliminarlo.
+status="$(curl -sS -H "Host: $host_header" -o "$work_dir/downloaded.pdf" -w '%{http_code}' -b "$cookies" \
+  "$base_url/api/v1/me/cv-documents/$pdf_document_id/download")"
+test "$status" = '200'
+cmp "$work_dir/cv.pdf" "$work_dir/downloaded.pdf"
+
 for id in "$pdf_document_id" "$docx_document_id"; do
   status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X DELETE \
     -H "X-CSRF-TOKEN: $csrf" "$base_url/api/v1/me/cv-documents/$id")"
@@ -159,4 +165,4 @@ status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$coo
   -H "X-CSRF-TOKEN: $csrf" "$base_url/api/v1/me/account")"
 test "$status" = '204'
 
-printf 'phase5-e2e: OK (PDF, DOCX, worker, proposals, duplicates, atomic confirmation, recalculation, cleanup)\n'
+printf 'phase5-e2e: OK (PDF, DOCX, worker, proposals, duplicates, confirmation, download, cleanup)\n'

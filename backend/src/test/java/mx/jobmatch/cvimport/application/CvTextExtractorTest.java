@@ -46,6 +46,28 @@ class CvTextExtractorTest {
         assertProposals(extractor.extract(file,"application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
     }
 
+    @Test void extractsOrdinaryCvSectionsWithoutMachineFormattedLabels()throws Exception{
+        Path file=directory.resolve("natural.docx");
+        try(XWPFDocument document=new XWPFDocument();var output=Files.newOutputStream(file)){
+            for(String line:List.of(
+                    "EXPERIENCIA LABORAL","Desarrollador Backend","Empresa Ejemplo","enero 2022 - junio 2024","Construcción de APIs con Java",
+                    "PRÁCTICAS PROFESIONALES","Becario de desarrollo","Laboratorio Digital","agosto 2021 - diciembre 2021",
+                    "SERVICIO SOCIAL","Desarrollador web","Universidad Pública","enero 2020 - junio 2020",
+                    "PROYECTOS PERSONALES","Plataforma de empleos","Proyecto independiente","marzo 2024 - actual",
+                    "EDUCACIÓN","Ingeniería en Computación","UNAM","2017 - 2021",
+                    "CERTIFICACIONES","Spring Professional","VMware | 2025",
+                    "IDIOMAS","Español: Nativo","Inglés - B2",
+                    "HABILIDADES","Java, Spring Boot y PostgreSQL"))document.createParagraph().createRun().setText(line);
+            document.write(output);
+        }
+        var proposals=extractor.extract(file,"application/vnd.openxmlformats-officedocument.wordprocessingml.document").proposals();
+        assertThat(proposals).extracting("type").contains("TRAJECTORY","EDUCATION","CERTIFICATION","LANGUAGE","SKILL");
+        assertThat(proposals.stream().filter(p->p.type().equals("TRAJECTORY")).map(p->p.payload().get("type")))
+                .contains("EMPLOYMENT","INTERNSHIP","TECHNICAL_SOCIAL_SERVICE","PERSONAL_PROJECT");
+        assertThat(proposals.stream().filter(p->p.type().equals("LANGUAGE")).map(p->p.payload().get("code")))
+                .contains("es","en");
+    }
+
     private void assertProposals(CvTextExtractor.Extraction result){
         assertThat(result.textHash()).hasSize(64);
         assertThat(result.proposals()).extracting("type")

@@ -97,6 +97,19 @@ public class JdbcCvImportAdapter implements CvImportRepository {
     }
 
     @Override
+    public Optional<DocumentFile> documentFile(UUID accountId,UUID documentId){
+        return jdbc.sql("""
+                SELECT file.storage_key,document.original_filename,file.detected_media_type
+                FROM cvimport.cv_document document JOIN cvimport.stored_file file ON file.id=document.stored_file_id
+                JOIN iam.account account ON account.id=document.account_id
+                WHERE account.public_id=:account AND account.status='ACTIVE'
+                  AND document.public_id=:document AND document.status='ACTIVE' AND file.status='STORED'
+                """).param("account",accountId).param("document",documentId)
+                .query((rs,row)->new DocumentFile(rs.getString("storage_key"),rs.getString("original_filename"),
+                        rs.getString("detected_media_type"))).optional();
+    }
+
+    @Override
     public Optional<ExtractionInput> startExtraction(UUID importId) {
         return jdbc.sql("""
                 UPDATE cvimport.import_run run SET status='PROCESSING',started_at=now()

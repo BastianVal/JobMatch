@@ -14,6 +14,7 @@ public interface CvImportRepository {
                         long profileBaseVersion, Instant expiresAt, String extractorVersion);
     Optional<CvImportView> find(UUID accountId, UUID importId);
     List<CvDocumentSummary> listDocuments(UUID accountId);
+    Optional<DocumentFile> documentFile(UUID accountId, UUID documentId);
     Optional<ExtractionInput> startExtraction(UUID importId);
     void completeExtraction(UUID importId, String textHash, List<ImportProposal> proposals);
     void failExtraction(UUID importId, String safeErrorCode);
@@ -26,5 +27,6 @@ public interface CvImportRepository {
     void expireReady(Instant now);
 
     record ExtractionInput(UUID importId, UUID accountId, String storageKey, String mediaType) {}
+    record DocumentFile(String storageKey, String originalFilename, String mediaType) {}
     record Confirmation(CvImportView view) {}
 }

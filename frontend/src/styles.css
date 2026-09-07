@@ -37,8 +37,8 @@ nav button.active, nav button:hover { background: #ffffff14; color: white; }
 .searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 24px; }
 .explore-page { display: grid; gap: 20px; }
 .explore-filters { display: grid; gap: 14px; border: 1px solid #d6d4ca; border-radius: 18px; padding: 18px; background: #fffdf8; }
-.filter-main { display: grid; grid-template-columns: minmax(230px,1fr) auto auto; align-items: end; gap: 10px; }
-.filter-main label { min-width: 0; }
+.filter-main { display: grid; grid-template-columns: minmax(230px,1fr) auto auto auto; align-items: end; gap: 10px; }
+.filter-main label { min-width: 0; }.search-field { position: relative; }
 .filter-details { border-top: 1px solid #e5e1d8; padding-top: 13px; }
 .filter-details summary { cursor: pointer; color: #3d4c43; font-size: .85rem; font-weight: 800; }
 .filter-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-top: 16px; }
@@ -48,7 +48,7 @@ nav button.active, nav button:hover { background: #ffffff14; color: white; }
 .choice-field input { width: auto; }
 .save-search { display: flex; justify-content: flex-end; align-items: end; gap: 10px; border-top: 1px solid #e5e1d8; padding-top: 14px; }
 .save-search label { min-width: min(100%,310px); }
-.saved-searches { display: grid; gap: 14px; border: 1px solid #cbd8ce; border-radius: 18px; padding: 18px; background: #edf4ee; }.saved-searches h2 { margin-bottom: 4px; font-size: 1.1rem; }.saved-searches p { margin: 0; color: #617067; font-size: .82rem; }.saved-search-list { display: grid; gap: 8px; }.saved-search-list article { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-radius: 11px; padding: 11px 12px; background: #fffdf8; }.saved-search-list article>div { display: flex; flex-wrap: wrap; gap: 6px; }.saved-search-list button { padding: 6px 9px; font-size: .75rem; }
+.saved-search-suggestions { position: absolute; z-index: 6; top: calc(100% + 6px); display: grid; gap: 5px; width: 100%; max-height: 280px; overflow-y: auto; border: 1px solid #bfd0c2; border-radius: 12px; padding: 8px; background: #fffdf8; box-shadow: 0 16px 35px #17211b24; }.saved-search-suggestions>small { padding: 2px 4px 6px; color: #5e6c63; font-size: .72rem; font-weight: 800; text-transform: uppercase; }.saved-search-suggestions article { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 8px; padding: 5px; }.saved-search-suggestions article:hover { background: #edf4ee; }.saved-search-apply { flex: 1; border: 0; padding: 8px; background: transparent; text-align: left; }.saved-search-suggestions article>div { display: flex; gap: 4px; }.saved-search-suggestions article>div button { padding: 5px 7px; font-size: .7rem; }
 .explore-workspace { display: grid; grid-template-columns: minmax(290px,.75fr) minmax(0,1.45fr); align-items: start; gap: 18px; }
 .job-stack,.job-detail { overflow: hidden; border: 1px solid #d6d4ca; border-radius: 18px; background: #fffdf8; box-shadow: 0 10px 30px #4053450a; }
 .job-stack { display: grid; }
@@ -99,11 +99,28 @@ legend { padding: 0 6px; color: #45534a; font-size: .84rem; font-weight: 800; }
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chips button { border: 0; border-radius: 99px; background: #e4f0e7; color: #245d3d; font-size: .78rem; }
 .cv-panel, .cv-panel form { display: grid; gap: 18px; }
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: #102017a8; backdrop-filter: blur(4px); }
+.cv-modal { width: min(920px,100%); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid #ccd4cc; border-radius: 22px; padding: clamp(20px,4vw,34px); background: #f8f6ef; box-shadow: 0 30px 100px #07130c73; }
+.modal-head { position: sticky; z-index: 2; top: -34px; display: flex; align-items: start; justify-content: space-between; gap: 18px; margin: -10px -10px 18px; border-bottom: 1px solid #ddd9cf; padding: 10px; background: #f8f6eff2; backdrop-filter: blur(10px); }
+.modal-close { border: 0; padding: 2px 9px; font-size: 1.8rem; line-height: 1; }
+.save-search-dialog { display: grid; gap: 16px; width: min(480px,100%); border: 1px solid #ccd4cc; border-radius: 20px; padding: 24px; background: #f8f6ef; box-shadow: 0 30px 100px #07130c73; }
+.save-search-dialog .modal-head { position: static; margin: -6px -6px 0; padding: 6px 6px 14px; }
+.save-search-dialog .actions { justify-content: flex-end; }
+.section-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.section-heading > span { white-space: nowrap; color: #55665a; font-weight: 800; }
+.cv-documents { display: grid; gap: 8px; }
+.cv-library { display: grid; gap: 4px; margin-top: 10px; border-top: 1px solid #dcd8cf; padding-top: 20px; }
+.button-link { display: inline-flex; align-items: center; border: 1px solid #c8cec7; border-radius: 10px; padding: 7px 10px; background: #fff; color: #24362b; font-size: .78rem; font-weight: 650; text-decoration: none; }
 .dropzone { place-items: center; min-height: 170px; border: 2px dashed #bfc8c0; border-radius: 18px; padding: 25px; background: #fffdf8; text-align: center; }
 .dropzone input { width: auto; border: 0; background: transparent; }
 .cv-run { display: grid; gap: 12px; }
 .candidate { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; border-top: 1px solid #e2dfd6; padding-top: 14px; }
+.candidate>.actions { grid-column: 1/-1; margin-top: 0; }
 .candidate pre { max-height: 180px; overflow: auto; border-radius: 8px; padding: 10px; background: #f2f1eb; font-size: .7rem; white-space: pre-wrap; }
+.proposal { display: grid; gap: 6px; margin: 10px 0; }
+.proposal div { display: grid; grid-template-columns: minmax(115px,.35fr) 1fr; gap: 10px; }
+.proposal dt { color: #66736b; font-weight: 700; }.proposal dd { margin: 0; }
+.duplicate { color: #795b19; font-size: .86rem; }.candidate select { max-width: 185px; }
 .profile-page { display: grid; gap: 22px; }
 .profile-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .profile-toolbar p { margin: 3px 0 0; color: #667169; font-size: .86rem; }

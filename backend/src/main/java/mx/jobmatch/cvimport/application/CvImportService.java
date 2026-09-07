@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -64,6 +65,13 @@ public class CvImportService {
 
     @Transactional(readOnly=true)
     public List<CvDocumentSummary> listDocuments(UUID accountId){return imports.listDocuments(accountId);}
+
+    @Transactional(readOnly=true)
+    public Download download(UUID accountId,UUID documentId){
+        var file=imports.documentFile(accountId,documentId).orElseThrow(ImportNotFound::new);
+        Path path=storage.resolve(file.storageKey());
+        return new Download(path,file.originalFilename(),file.mediaType());
+    }
 
     @Transactional
     public CvImportView decide(UUID accountId,UUID importId,UUID candidateId,long version,String decision,String resolution){
@@ -126,4 +134,5 @@ public class CvImportService {
         if(cleaned.isEmpty()||cleaned.length()>255||cleaned.chars().anyMatch(c->c<32))throw new InvalidFile("El nombre del archivo no es válido.");
         return cleaned;
     }
+    public record Download(Path path,String originalFilename,String mediaType){}
 }
