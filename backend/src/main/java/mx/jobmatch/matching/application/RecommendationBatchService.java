@@ -22,10 +22,13 @@ public class RecommendationBatchService {
     public void refresh(UUID accountId){profiles.findByAccount(accountId).ifPresent(profile->{
         var evaluated=new ArrayList<EvaluatedJob>();
         for(var jobId:matches.recommendationCandidates(accountId,2_000))jobs.find(jobId).ifPresent(job->
-                evaluated.add(new EvaluatedJob(job,evaluator.evaluate(profile,job))));
+                evaluated.add(new EvaluatedJob(job,evaluator.evaluate(profile,job),profile.data().targetRoles().stream()
+                        .filter(role->role.roleFamilyId().equals(job.roleFamilyId())).mapToInt(role->role.priority())
+                        .findFirst().orElse(11))));
         evaluated.sort(Comparator.comparing((EvaluatedJob item)->item.match().score()).reversed()
+                .thenComparingInt(EvaluatedJob::targetPriority)
                 .thenComparing(item->item.job().publishedAt(),Comparator.reverseOrder()).thenComparing(item->item.job().id()));
         matches.replaceRecommendations(profile.id(),profile.version(),evaluated.stream().limit(500).map(item->item.match().id()).toList());
     });}
-    private record EvaluatedJob(JobDetail job, MatchEvaluation match){}
+    private record EvaluatedJob(JobDetail job, MatchEvaluation match,int targetPriority){}
 }

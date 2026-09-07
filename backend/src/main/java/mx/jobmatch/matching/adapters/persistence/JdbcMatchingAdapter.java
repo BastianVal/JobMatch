@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Repository
 public class JdbcMatchingAdapter implements MatchingRepository {
@@ -113,6 +114,8 @@ public class JdbcMatchingAdapter implements MatchingRepository {
                 JOIN jobs.employer employer ON employer.id=job.employer_id
                 LEFT JOIN profile.profile_preference preference ON preference.profile_id=profile.id
                 WHERE account.public_id=:account AND job.status='ACTIVE'
+                  AND NOT EXISTS(SELECT 1 FROM tracking.user_job tracked
+                    WHERE tracked.account_id=account.id AND tracked.canonical_job_id=job.id AND tracked.state='DISCARDED')
                   AND NOT EXISTS(SELECT 1 FROM profile.excluded_employer excluded WHERE excluded.profile_id=profile.id
                     AND excluded.employer_name_normalized=employer.name_normalized)
                   AND (preference.remote_mode IS NULL OR preference.remote_mode='ANY' OR preference.remote_mode=job.remote_mode)
@@ -121,6 +124,47 @@ public class JdbcMatchingAdapter implements MatchingRepository {
                     (job.salary_max_monthly IS NOT NULL AND job.salary_max_monthly>=preference.minimum_monthly_salary))
                 GROUP BY job.public_id,job.published_at ORDER BY priority,job.published_at DESC,job.public_id DESC LIMIT :maximum
                 """).param("account",accountId).param("maximum",maximum).query((rs,row)->rs.getObject("public_id",UUID.class)).list();
+    }
+
+    @Override public Optional<RecommendationGeneration> recommendationGeneration(UUID profileId){
+        return jdbc.sql("""
+                SELECT generation.profile_version,generation.catalog_version,generation.generated_at
+                FROM matching.recommendation_generation generation
+                JOIN profile.professional_profile profile ON profile.id=generation.profile_id
+                WHERE profile.public_id=:profile
+                """).param("profile",profileId).query((rs,row)->new RecommendationGeneration(
+                rs.getLong("profile_version"),rs.getInt("catalog_version"),rs.getTimestamp("generated_at").toInstant())).optional();
+    }
+
+    @Override public List<MatchEvaluation.Recommendation> recommendations(UUID accountId,long profileVersion,int maximum){
+        var rows=jdbc.sql("""
+                SELECT result.id internal_id,result.public_id,result.score,result.classification,result.component_scores::text,
+                       job.public_id job_id,job.title,employer.canonical_name employer,job.seniority,job.remote_mode,
+                       job.employment_type,job.published_at,result.job_version,result.catalog_version,result.scoring_version
+                FROM matching.recommendation recommendation
+                JOIN matching.match_result result ON result.id=recommendation.match_result_id
+                JOIN profile.professional_profile profile ON profile.id=recommendation.profile_id
+                JOIN iam.account account ON account.id=profile.account_id
+                JOIN jobs.canonical_job job ON job.id=result.canonical_job_id
+                JOIN jobs.employer employer ON employer.id=job.employer_id
+                WHERE account.public_id=:account AND recommendation.profile_version=:profileVersion
+                  AND result.profile_version=:profileVersion AND job.status='ACTIVE'
+                  AND NOT EXISTS(SELECT 1 FROM tracking.user_job tracked
+                    WHERE tracked.account_id=account.id AND tracked.canonical_job_id=job.id AND tracked.state='DISCARDED')
+                ORDER BY recommendation.rank LIMIT :maximum
+                """).param("account",accountId).param("profileVersion",profileVersion).param("maximum",maximum)
+                .query((rs,row)->new RecommendationRow(new ResultRow(rs.getLong("internal_id"),
+                        rs.getObject("public_id",UUID.class),rs.getBigDecimal("score"),rs.getString("classification"),
+                        rs.getString("component_scores")),rs.getObject("job_id",UUID.class),rs.getString("title"),
+                        rs.getString("employer"),rs.getString("seniority"),rs.getString("remote_mode"),
+                        rs.getString("employment_type"),rs.getTimestamp("published_at").toInstant(),rs.getLong("job_version"),
+                        rs.getInt("catalog_version"),rs.getString("scoring_version"))).list();
+        return rows.stream().map(row->{
+            var evaluation=hydrate(row.result(),row.jobId(),profileVersion,row.jobVersion(),row.catalogVersion(),row.scoringVersion());
+            return new MatchEvaluation.Recommendation(row.jobId(),row.title(),row.employer(),row.seniority(),row.remoteMode(),
+                    row.employmentType(),row.publishedAt(),evaluation.score(),evaluation.classification(),
+                    evaluation.components(),evaluation.reasons());
+        }).toList();
     }
 
     @Override public List<UUID> pendingProfileAccounts(int maximum){
@@ -192,4 +236,7 @@ public class JdbcMatchingAdapter implements MatchingRepository {
     }
     private record ResultRow(long id,UUID publicId,BigDecimal score,String classification,String components){}
     private record OwnedResult(ResultRow row,UUID jobId,long profileVersion,long jobVersion,int catalogVersion,String scoringVersion){}
+    private record RecommendationRow(ResultRow result,UUID jobId,String title,String employer,String seniority,
+                                     String remoteMode,String employmentType,Instant publishedAt,long jobVersion,
+                                     int catalogVersion,String scoringVersion){}
 }

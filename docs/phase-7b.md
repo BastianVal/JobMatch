@@ -10,7 +10,9 @@
   consulta contenida desde dos caracteres, debounce de 250 ms, máximo diez roles y
   prioridad reordenable.
 - Validación en cliente junto a cada grupo y validación autoritativa en backend.
-- El backend rechaza familias inactivas, inexistentes o no seleccionables.
+- El backend rechaza familias inactivas, inexistentes o no seleccionables. Como
+  compatibilidad de migración, un perfil puede conservar una familia histórica que
+  ya tenía seleccionada, pero no puede agregarla a un perfil nuevo.
 - Lectura de los cinco CV activos más recientes dentro del perfil. La carga y revisión
   se integrarán en esta misma página durante la Fase 7F.
 
@@ -26,7 +28,8 @@ GET /api/v1/me/cv-documents
 
 `PUT /me/profile` conserva el bloqueo optimista mediante `If-Match`. Los UUID y nombres
 generados en el cliente no son autoridad de catálogo: persistencia resuelve la familia
-por UUID y exige `active AND selectable`.
+por UUID y exige que esté activa y sea seleccionable, salvo una selección histórica ya
+perteneciente al mismo perfil.
 
 ## Criterios de comprobación
 

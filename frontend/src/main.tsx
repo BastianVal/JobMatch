@@ -11,6 +11,7 @@ type Job = { id?: string; jobId?: string; title: string; employer: string; senio
 type TrackingEvent = { id: string; fromState?: TrackingState; toState: TrackingState; note?: string; resultingVersion: number; occurredAt: string };
 type TrackedJob = { id: string; jobId: string; title: string; employer: string; state: TrackingState; note?: string; version: number; updatedAt: string; history: TrackingEvent[] };
 type Match = { score: number; classification: string; reasons: { id: string; type: string; explanation: string; points: number }[] };
+type RecommendationFeed = { status:'UPDATING'|'READY'; profileVersion:number; generatedProfileVersion?:number; generatedAt?:string; items:Job[] };
 type CvRun = { id: string; status: string; originalFilename: string; candidates: CvCandidate[]; safeErrorCode?: string };
 type CvCandidate = { id: string; type: string; proposal: Record<string, unknown>; decision: string; decisionVersion: number; duplicate?: { similarityScore: number; resolution?: string } };
 
@@ -57,16 +58,21 @@ function Workspace({ account, onLogout }: { account: Account; onLogout: () => vo
 function JobsView({ mode, notify }: { mode:'recommendations'|'search'; notify:(value:string)=>void }) {
   const [jobs, setJobs] = useState<Job[]>([]); const [activity, setActivity] = useState<Record<string,Activity>>({});
   const [loading, setLoading] = useState(true); const [query, setQuery] = useState(''); const [error, setError] = useState('');
-  async function load(search=query) {
-    setLoading(true); setError('');
+  const [recommendationStatus,setRecommendationStatus]=useState<'UPDATING'|'READY'>('READY');
+  async function load(search=query,background=false) {
+    if(!background)setLoading(true); setError('');
     try {
-      const result = mode==='recommendations' ? await api<Job[]>('/me/recommendations?limit=50') : (await api<{items:Job[]}>(`/jobs/search?q=${encodeURIComponent(search)}&limit=25`)).items;
+      let result:Job[];
+      if(mode==='recommendations'){
+        const feed=await api<RecommendationFeed>('/me/recommendations?limit=50');setRecommendationStatus(feed.status);result=feed.items;
+      }else result=(await api<{items:Job[]}>(`/jobs/search?q=${encodeURIComponent(search)}&limit=25`)).items;
       const ids = result.map(job=>job.jobId || job.id!).filter(Boolean);
       if (ids.length) { const params = ids.map(id=>`jobId=${encodeURIComponent(id)}`).join('&'); const before = await api<Activity[]>(`/me/job-activity?${params}`); setActivity(Object.fromEntries(before.map(item=>[item.jobId,item]))); }
       setJobs(result);
-    } catch (failure) { setError(errorMessage(failure)); } finally { setLoading(false); }
+    } catch (failure) { setError(errorMessage(failure)); } finally { if(!background)setLoading(false); }
   }
   useEffect(()=>{ void load(''); },[mode]);
+  useEffect(()=>{if(mode!=='recommendations'||recommendationStatus!=='UPDATING')return;const timer=setInterval(()=>void load('',true),2000);return()=>clearInterval(timer);},[mode,recommendationStatus]);
   useEffect(()=>{
     if(loading||!jobs.length)return;
     const ids=jobs.map(job=>job.jobId||job.id!).filter(Boolean);
@@ -79,7 +85,7 @@ function JobsView({ mode, notify }: { mode:'recommendations'|'search'; notify:(v
     try { const tracked=await api<TrackedJob>(`/me/jobs/${jobId}/tracking`, { method:'PUT', headers:{'If-Match':String(current?.version||0),'Idempotency-Key':crypto.randomUUID()}, body:JSON.stringify({state}) }); setActivity(values=>({...values,[jobId]:{...values[jobId],jobId,new:false,trackingId:tracked.id,state:tracked.state,version:tracked.version,note:tracked.note}})); notify(`Vacante actualizada: ${stateLabel[state]}.`); }
     catch (failure) { if (failure instanceof ApiError && failure.problem.code==='VERSION_CONFLICT') await refreshActivity(jobId); notify(errorMessage(failure)); }
   }
-  return <section>{mode==='search' && <form className="searchbar" onSubmit={event=>{event.preventDefault();void load(query)}}><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Rol, tecnología o empresa"/><button className="primary">Buscar</button></form>}{loading?<Loading label="Buscando oportunidades"/>:error?<Retry message={error} onRetry={()=>void load()}/>:jobs.length===0?<Empty title={mode==='search'?'No encontramos vacantes':'Aún no hay recomendaciones'} detail={mode==='search'?'Prueba con términos más amplios.':'Agrega al menos un rol objetivo en tu perfil.'}/>:<div className="job-grid">{jobs.map(job=>{const id=job.jobId||job.id!;return <JobCard key={id} job={job} activity={activity[id]} onTransition={state=>void transition(id,state)} notify={notify}/>})}</div>}</section>;
+  return <section>{mode==='search' && <form className="searchbar" onSubmit={event=>{event.preventDefault();void load(query)}}><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Rol, tecnología o empresa"/><button className="primary">Buscar</button></form>}{loading?<Loading label="Buscando oportunidades"/>:error?<Retry message={error} onRetry={()=>void load()}/>:mode==='recommendations'&&recommendationStatus==='UPDATING'?<div className="recommendation-updating"><span></span><div><h3>Actualizando tus recomendaciones</h3><p>Aplicamos los cambios de tu perfil. Esta lista se reemplazará automáticamente cuando termine.</p></div></div>:jobs.length===0?<Empty title={mode==='search'?'No encontramos vacantes':'Aún no hay recomendaciones'} detail={mode==='search'?'Prueba con términos más amplios.':'Agrega al menos un rol objetivo en tu perfil o espera a que existan vacantes compatibles.'}/>:<div className="job-grid">{jobs.map(job=>{const id=job.jobId||job.id!;return <JobCard key={id} job={job} activity={activity[id]} onTransition={state=>void transition(id,state)} notify={notify}/>})}</div>}</section>;
 }
 
 function JobCard({ job, activity, onTransition, notify }: { job:Job; activity?:Activity; onTransition:(state:TrackingState)=>void; notify:(value:string)=>void }) {

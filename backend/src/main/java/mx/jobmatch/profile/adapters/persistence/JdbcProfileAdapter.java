@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
 
 @Repository
 public class JdbcProfileAdapter implements ProfileRepository {
@@ -57,6 +58,11 @@ public class JdbcProfileAdapter implements ProfileRepository {
                 .orElseThrow(() -> new InvalidProfile("La cuenta no está activa."));
         if (profile.version() != expectedVersion) throw new VersionConflict();
         long nextVersion = expectedVersion + 1;
+        Set<UUID> previouslySelectedRoles = Set.copyOf(jdbc.sql("""
+                SELECT family.public_id FROM profile.target_role target
+                JOIN catalog.role_family family ON family.id=target.role_family_id
+                WHERE target.profile_id=:profileId
+                """).param("profileId", profile.id()).query(UUID.class).list());
 
         jdbc.sql("""
                 UPDATE profile.professional_profile SET headline=:headline, summary=:summary, location=:location,
@@ -64,7 +70,7 @@ public class JdbcProfileAdapter implements ProfileRepository {
                 """).param("headline", draft.headline()).param("summary", draft.summary()).param("location", draft.location())
                 .param("seniority", draft.seniority()).param("version", nextVersion).param("profileId", profile.id()).update();
         clearChildren(profile.id());
-        insertChildren(profile.id(), nextVersion, draft, projections);
+        insertChildren(profile.id(), nextVersion, draft, projections, previouslySelectedRoles);
         return findByAccount(accountId).orElseThrow();
     }
 
@@ -80,14 +86,16 @@ public class JdbcProfileAdapter implements ProfileRepository {
     }
 
     private void insertChildren(long profileId, long version, ProfileDraft draft,
-                                Map<UUID, SkillDurationCalculator.Projection> projections) {
+                                Map<UUID, SkillDurationCalculator.Projection> projections,
+                                Set<UUID> previouslySelectedRoles) {
         for (var role : draft.targetRoles()) {
             int count = jdbc.sql("""
                     INSERT INTO profile.target_role(public_id, profile_id, role_family_id, priority)
                     SELECT :id, :profileId, id, :priority FROM catalog.role_family
-                    WHERE public_id=:roleId AND active AND selectable
+                    WHERE public_id=:roleId AND active AND (selectable OR :previouslySelected)
                     """).param("id", role.id()).param("profileId", profileId).param("priority", role.priority())
-                    .param("roleId", role.roleFamilyId()).update();
+                    .param("roleId", role.roleFamilyId())
+                    .param("previouslySelected", previouslySelectedRoles.contains(role.roleFamilyId())).update();
             if (count != 1) throw new InvalidCatalogReference();
         }
         if (draft.preferences() != null) {

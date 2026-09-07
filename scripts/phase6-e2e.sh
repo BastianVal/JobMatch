@@ -62,7 +62,7 @@ test "$status" = '200'
 
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X POST \
   -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" \
-  --data "{\"roleFamilyId\":\"11000000-0000-0000-0000-000000000001\",\"query\":\"Phase6 Backend $run_key\",\"location\":\"Ciudad de México\"}" \
+  --data "{\"roleFamilyId\":\"11100000-0000-0000-0000-000000000011\",\"query\":\"Phase6 Backend $run_key\",\"location\":\"Ciudad de México\"}" \
   "$base_url/api/v1/job-refreshes")"
 test "$status" = '202'
 refresh_id="$(grep -o '"id":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"
@@ -74,14 +74,29 @@ while test "$attempt" -lt 60; do
 done
 grep -q '"status":"COMPLETED"' "$body"
 
-curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/jobs/search?q=Tecnologia%20Ejemplo&limit=10" > "$body"
-job_id="$(grep -o '"id":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"
+# Una nueva versión encola el cálculo asíncrono cuando la vacante ya existe.
+payload="$(profile_payload '[]')"
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "1"' --data "$payload" "$base_url/api/v1/me/profile")"
+test "$status" = '200'
+
+# La proyección asíncrona queda lista y contiene vacantes del rol objetivo.
+attempt=0
+while test "$attempt" -lt 60; do
+  curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/me/recommendations?limit=10" > "$body"
+  grep -q '"status":"READY"' "$body" && grep -q '"jobId":"' "$body" && break
+  attempt=$((attempt+1));sleep 1
+done
+grep -q '"status":"READY"' "$body"
+grep -q 'ROLE_RESPONSIBILITIES' "$body"
+grep -q 'TECHNOLOGIES_KNOWLEDGE' "$body"
+job_id="$(grep -o '"jobId":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"
 test -n "$job_id"
 
 # Primera evaluación crea snapshots y la segunda usa exactamente la misma clave de versiones.
 curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/jobs/$job_id/match" > "$body"
 grep -q '"scoringVersion":"score-1"' "$body"
-grep -q '"profileVersion":1' "$body"
+grep -q '"profileVersion":2' "$body"
 grep -q '"requirement"' "$body"
 grep -q '"evidence"' "$body"
 first_match_id="$(grep -o '"id":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"
@@ -89,34 +104,48 @@ curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/jobs/$job_id/m
 grep -q '"cached":true' "$body"
 grep -q "\"id\":\"$first_match_id\"" "$body"
 
+# Un descarte se excluye incluso si la proyección ya estaba generada.
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "0"' \
+  -H "Idempotency-Key: discard-$run_key" --data '{"state":"DISCARDED"}' \
+  "$base_url/api/v1/me/jobs/$job_id/tracking")"
+test "$status" = '200'
 curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/me/recommendations?limit=10" > "$body"
-grep -q "$job_id" "$body"
-grep -q 'ROLE_RESPONSIBILITIES' "$body"
-grep -q 'TECHNOLOGIES_KNOWLEDGE' "$body"
+if grep -q "$job_id" "$body";then echo 'discarded job leaked into recommendations';exit 1;fi
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "1"' \
+  -H "Idempotency-Key: restore-$run_key" --data '{"state":"SAVED"}' \
+  "$base_url/api/v1/me/jobs/$job_id/tracking")"
+test "$status" = '200'
 
 # Una nueva versión de perfil produce otra clave, sin sobrescribir el resultado anterior.
 payload="$(profile_payload '[]')"
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
-  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "1"' --data "$payload" "$base_url/api/v1/me/profile")"
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "2"' --data "$payload" "$base_url/api/v1/me/profile")"
 test "$status" = '200'
 curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/jobs/$job_id/match" > "$body"
-grep -q '"profileVersion":2' "$body"
+grep -q '"profileVersion":3' "$body"
 second_match_id="$(grep -o '"id":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"
 test "$first_match_id" != "$second_match_id"
 
 # El resultado histórico sigue reconstruible desde sus snapshots, aunque el perfil actual ya sea versión 2.
 curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/matches/$first_match_id" > "$body"
 grep -q "\"id\":\"$first_match_id\"" "$body"
-grep -q '"profileVersion":1' "$body"
+grep -q '"profileVersion":2' "$body"
 grep -q '"requirement"' "$body"
 grep -q '"evidence"' "$body"
 
 # Las exclusiones siempre se aplican a recomendaciones.
 payload="$(profile_payload '["Tecnología Ejemplo"]')"
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
-  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "2"' --data "$payload" "$base_url/api/v1/me/profile")"
+  -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "3"' --data "$payload" "$base_url/api/v1/me/profile")"
 test "$status" = '200'
-curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/me/recommendations?limit=10" > "$body"
+attempt=0
+while test "$attempt" -lt 30; do
+  curl -fsS -H "Host: $host_header" -b "$cookies" "$base_url/api/v1/me/recommendations?limit=10" > "$body"
+  grep -q '"status":"READY"' "$body" && break
+  attempt=$((attempt+1));sleep 1
+done
 if grep -q "$job_id" "$body";then echo 'excluded employer leaked into recommendations';exit 1;fi
 
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X DELETE \

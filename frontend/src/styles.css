@@ -54,6 +54,9 @@ nav button.active, nav button:hover { background: #ffffff14; color: white; }
 .loading span { width: 28px; height: 28px; border: 3px solid #c7d8cc; border-top-color: #28704c; border-radius: 50%; animation: spin .8s linear infinite; }
 .loading p { margin: 12px 0 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.recommendation-updating { display: flex; align-items: center; gap: 18px; min-height: 120px; border: 1px solid #b9d1c1; border-radius: 18px; padding: 24px; background: #edf6ef; }
+.recommendation-updating>span { flex: 0 0 28px; width: 28px; height: 28px; border: 3px solid #bfd6c6; border-top-color: #28704c; border-radius: 50%; animation: spin .8s linear infinite; }
+.recommendation-updating h3 { margin-bottom: 5px; }.recommendation-updating p { margin: 0; color: #526159; }
 .tracking-list { display: grid; gap: 14px; }
 .tracking-card { display: grid; grid-template-columns: minmax(200px,1fr) auto; align-items: start; }
 .tracking-card details { grid-column: 1/-1; margin-top: 15px; border-top: 1px solid #e2dfd6; padding-top: 12px; color: #59655d; }

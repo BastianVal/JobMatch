@@ -2,6 +2,7 @@ package mx.jobmatch.profile.application;
 
 import mx.jobmatch.catalog.application.CatalogQueryPort;
 import mx.jobmatch.operations.application.OutboxPort;
+import mx.jobmatch.operations.application.BackgroundTaskPort;
 import mx.jobmatch.profile.domain.ProfessionalProfile;
 import mx.jobmatch.profile.domain.ProfileDraft;
 import mx.jobmatch.profile.domain.SkillDurationCalculator;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.YearMonth;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,11 +35,14 @@ public class ProfileService {
     private final ProfileRepository profiles;
     private final CatalogQueryPort catalog;
     private final OutboxPort outbox;
+    private final BackgroundTaskPort tasks;
 
-    public ProfileService(ProfileRepository profiles, CatalogQueryPort catalog, OutboxPort outbox) {
+    public ProfileService(ProfileRepository profiles, CatalogQueryPort catalog, OutboxPort outbox,
+                          BackgroundTaskPort tasks) {
         this.profiles = profiles;
         this.catalog = catalog;
         this.outbox = outbox;
+        this.tasks = tasks;
     }
 
     @Transactional(readOnly = true)
@@ -56,6 +61,9 @@ public class ProfileService {
         outbox.append("PROFILE", saved.id(), "ProfileChanged",
                 "{\"profileId\":\"" + saved.id() + "\",\"profileVersion\":" + saved.version()
                         + ",\"catalogVersion\":" + catalogVersion + "}");
+        tasks.enqueue("REFRESH_RECOMMENDATIONS", "{\"accountId\":\"" + accountId + "\"}",
+                "recommendations:" + saved.id() + ":" + saved.version() + ":" + catalogVersion,
+                Instant.now(), 5);
         return saved;
     }
 

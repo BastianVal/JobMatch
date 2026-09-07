@@ -2,6 +2,7 @@ package mx.jobmatch.profile.application;
 
 import mx.jobmatch.catalog.application.CatalogQueryPort;
 import mx.jobmatch.operations.application.OutboxPort;
+import mx.jobmatch.operations.application.BackgroundTaskPort;
 import mx.jobmatch.profile.domain.ProfessionalProfile;
 import mx.jobmatch.profile.domain.ProfileDraft;
 import mx.jobmatch.profile.domain.SkillDurationCalculator;
@@ -22,7 +23,8 @@ class ProfileServiceTest {
     ProfileRepository repository = mock(ProfileRepository.class);
     CatalogQueryPort catalog = mock(CatalogQueryPort.class);
     OutboxPort outbox = mock(OutboxPort.class);
-    ProfileService service = new ProfileService(repository, catalog, outbox);
+    BackgroundTaskPort tasks = mock(BackgroundTaskPort.class);
+    ProfileService service = new ProfileService(repository, catalog, outbox, tasks);
 
     @Test
     void saveCalculatesProjectionAndPublishesVersionedChange() {
@@ -50,6 +52,8 @@ class ProfileServiceTest {
         assertThat(projections.getValue().get(skillId).professionalMonths()).isEqualTo(3);
         assertThat(projections.getValue().get(skillId).weightedPracticalMonths()).isEqualByComparingTo("3.00");
         verify(outbox).append(eq("PROFILE"), eq(profileId), eq("ProfileChanged"), contains("\"profileVersion\":3"));
+        verify(tasks).enqueue(eq("REFRESH_RECOMMENDATIONS"), contains(accountId.toString()),
+                contains(profileId.toString()), any(), eq(5));
     }
 
     @Test
@@ -61,6 +65,6 @@ class ProfileServiceTest {
 
         assertThatThrownBy(() -> service.replace(UUID.randomUUID(), 0, draft))
                 .isInstanceOf(ProfileExceptions.InvalidProfile.class);
-        verifyNoInteractions(repository, outbox);
+        verifyNoInteractions(repository, outbox, tasks);
     }
 }

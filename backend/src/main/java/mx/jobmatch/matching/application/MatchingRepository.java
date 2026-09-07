@@ -6,6 +6,7 @@ import mx.jobmatch.matching.domain.MatchEvaluation;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 public interface MatchingRepository {
     List<CatalogSkill> catalogSkills();
@@ -16,7 +17,10 @@ public interface MatchingRepository {
     MatchEvaluation save(UUID profileId,MatchEvaluation evaluation);
     List<UUID> recommendationCandidates(UUID accountId,int maximum);
     List<UUID> pendingProfileAccounts(int maximum);
+    Optional<RecommendationGeneration> recommendationGeneration(UUID profileId);
+    List<MatchEvaluation.Recommendation> recommendations(UUID accountId,long profileVersion,int maximum);
     void replaceRecommendations(UUID profileId,long profileVersion,List<UUID> matchResultIds);
     int deleteObsolete();
     record CatalogSkill(UUID id,String name,List<String> aliases){}
+    record RecommendationGeneration(long profileVersion,int catalogVersion,Instant generatedAt){}
 }

@@ -259,8 +259,7 @@ public class JdbcIngestionAdapter implements IngestionRepository {
             updatePosting(existing.get().postingId(), p);
             jdbc.sql("UPDATE jobs.job_source_link SET active=true WHERE source_posting_id=:posting")
                     .param("posting", existing.get().postingId()).update();
-            jdbc.sql("UPDATE jobs.canonical_job SET status='ACTIVE', updated_at=now(), version=version+1 WHERE id=:job")
-                    .param("job", existing.get().jobId()).update();
+            updateClassification(existing.get().jobId(), p);
             rebuildSearch(existing.get().jobId());
             recordPayload(runId, source.id(), existing.get().postingId(), p);
             event(existing.get().jobPublicId(), "UPDATED");
@@ -331,6 +330,22 @@ public class JdbcIngestionAdapter implements IngestionRepository {
                 .param("id",UUID.randomUUID()).param("job",job.id()).param("text",p.description().substring(0,Math.min(500,p.description().length()))).update();
         inferSkill(job.id(),p);
         return job;
+    }
+
+    private void updateClassification(long jobId, NormalizedPosting posting) {
+        var resolution = roles.resolve(posting.title()).orElse(null);
+        Long role = resolution == null ? null : jdbc.sql("""
+                SELECT role.id FROM catalog.role_family role
+                JOIN catalog.catalog_version version ON version.id=role.catalog_version_id
+                WHERE role.public_id=:id AND role.active AND version.status='PUBLISHED'
+                """).param("id", resolution.roleFamilyId()).query(Long.class).optional().orElse(null);
+        String seniority = posting.seniority() != null ? posting.seniority()
+                : resolution == null ? null : resolution.seniority();
+        jdbc.sql("""
+                UPDATE jobs.canonical_job
+                SET role_family_id=:role, seniority=:seniority, status='ACTIVE', updated_at=now(), version=version+1
+                WHERE id=:job
+                """).param("role", role).param("seniority", seniority).param("job", jobId).update();
     }
 
     private void inferSkill(long jobId, NormalizedPosting p) {
