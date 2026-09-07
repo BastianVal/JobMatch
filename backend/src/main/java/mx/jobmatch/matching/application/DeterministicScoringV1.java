@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Component
 public class DeterministicScoringV1 {
-    public static final String VERSION="score-2";
+    public static final String VERSION="score-3";
 
     public MatchEvaluation evaluate(ProfessionalProfile profile,JobDetail job,JobFacts facts){
         var reasons=new ArrayList<MatchEvaluation.Reason>();
@@ -129,13 +129,15 @@ public class DeterministicScoringV1 {
         Set<UUID> evidence=new HashSet<>();
         Set<UUID> wanted=new HashSet<>();facts.skills().forEach(skill->wanted.add(skill.skillId()));
         profile.skills().stream().filter(skill->wanted.contains(skill.catalogSkillId())).forEach(skill->evidence.addAll(skill.evidenceTrajectoryIds()));
-        long relevant=profile.trajectory().stream().filter(item->item.type()!=TrajectoryType.EMPLOYMENT).filter(item->evidence.contains(item.id())).count();
+        var relevantItems=profile.trajectory().stream().filter(item->item.type()!=TrajectoryType.EMPLOYMENT).filter(item->evidence.contains(item.id())).toList();
+        long relevant=relevantItems.size();
         if(profile.trajectory().stream().noneMatch(item->item.type()!=TrajectoryType.EMPLOYMENT)){
             reason(reasons,"RELEVANT_PROJECTS","CONSIDERATION",null,map("requiredSkills",wanted),Map.of(),7.5,
                     "El perfil no contiene contextos de proyecto comparables.");return 7.5;
         }
         double points=Math.min(15,relevant*7.5);
-        reason(reasons,"RELEVANT_PROJECTS",relevant>0?"MATCH":"GAP",null,map("requiredSkills",wanted),map("trajectoryIds",evidence),points,
+        reason(reasons,"RELEVANT_PROJECTS",relevant>0?"MATCH":"GAP",null,map("requiredSkills",wanted),
+                map("trajectoryNames",relevantItems.stream().map(DeterministicScoringV1::trajectoryName).toList()),points,
                 relevant>0?"Hay proyectos con evidencia de tecnologías relevantes.":"No hay proyectos con evidencia relevante.");return points;
     }
 
@@ -172,6 +174,7 @@ public class DeterministicScoringV1 {
     private static String classification(double score){return score>=85?"EXCELLENT":score>=70?"STRONG":score>=50?"POSSIBLE":"LOW";}
     private static BigDecimal decimal(double value){return BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP);}
     private static String priorityLabel(String priority){return switch(priority){case "REQUIRED"->"obligatorias";case "DESIRED"->"deseables";case "RESPONSIBILITY"->"relacionadas con responsabilidades";default->"sin clasificar";};}
+    private static String trajectoryName(ProfileDraft.TrajectoryItem item){return item.organization()==null||item.organization().isBlank()?item.title():item.title()+" — "+item.organization();}
     private static Map<String,Object> map(Object...values){Map<String,Object> result=new LinkedHashMap<>();for(int i=0;i<values.length;i+=2)result.put((String)values[i],values[i+1]);return result;}
     private static void reason(List<MatchEvaluation.Reason> reasons,String component,String type,UUID requirementId,
                                Map<String,Object> requirement,Map<String,Object> evidence,double points,String explanation){

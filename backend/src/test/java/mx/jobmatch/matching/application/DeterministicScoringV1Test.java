@@ -51,6 +51,22 @@ class DeterministicScoringV1Test {
                 });
     }
 
+    @Test void projectEvidenceContainsReadableTrajectoryNames(){
+        UUID project=UUID.randomUUID();
+        var data=new ProfileDraft("Backend",null,"CDMX","MID",
+                List.of(new ProfileDraft.TargetRole(UUID.randomUUID(),ROLE,1,"Software")),null,List.of(),
+                List.of(new ProfileDraft.TrajectoryItem(project,TrajectoryType.PERSONAL_PROJECT,"API de pagos","Proyecto personal",null,2024,1,2024,3,false)),
+                List.of(),List.of(),List.of(),List.of(new ProfileDraft.Skill(UUID.randomUUID(),JAVA,null,"Java","ADVANCED",true,
+                List.of(project),0,new BigDecimal("2.5"))));
+        var result=scoring.evaluate(new ProfessionalProfile(UUID.randomUUID(),1,1,data),job("MID"),
+                new JobFacts(ROLE,"MID",null,List.of(skill(JAVA,"Java","REQUIRED")),List.of(),List.of()));
+
+        assertThat(result.reasons()).anySatisfy(reason->{
+            assertThat(reason.component()).isEqualTo("RELEVANT_PROJECTS");
+            assertThat(reason.evidence()).containsEntry("trajectoryNames",List.of("API de pagos — Proyecto personal"));
+        });
+    }
+
     @Test void juniorAgainstSeniorIsCappedUnlessProfessionalRequirementIsMet(){
         var profile=profile("JUNIOR",12);
         var noRequirement=new JobFacts(ROLE,"SENIOR",null,List.of(skill(JAVA,"Java","DESIRED")),List.of(),List.of());
