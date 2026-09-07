@@ -9,7 +9,9 @@
   admite hasta diez y consulta sugerencias después de dos caracteres.
 - Los filtros multivalor se envían como parámetros repetidos: OR dentro de cada
   grupo y AND entre grupos, tal como aplica la consulta SQL.
-- Se pueden guardar búsquedas con nombre desde la misma pantalla.
+- Se pueden guardar búsquedas con nombre desde la misma pantalla. Las guardadas se
+  muestran como accesos reutilizables y permiten aplicar de nuevo todos sus filtros,
+  renombrarlas o eliminarlas.
 - La página se presenta como lista de hasta 25 vacantes a la izquierda y detalle a
   la derecha. Se selecciona automáticamente la primera vacante de cada página.
 - El detalle incluye descripción, requisitos, habilidades, ubicación, salario,
@@ -26,6 +28,8 @@ GET /api/v1/jobs/search
 GET /api/v1/jobs/{id}
 POST /api/v1/me/saved-searches
 GET /api/v1/me/saved-searches
+PUT /api/v1/me/saved-searches/{id}
+DELETE /api/v1/me/saved-searches/{id}
 ```
 
 Los filtros que aceptan múltiples valores se repiten en la URL, por ejemplo:

@@ -99,7 +99,8 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
   const [selectedId,setSelectedId]=useState<string>(); const [detail,setDetail]=useState<JobDetail>();
   const [activity,setActivity]=useState<Record<string,Activity>>({}); const [loading,setLoading]=useState(true); const [detailLoading,setDetailLoading]=useState(false);
   const [error,setError]=useState(''); const [roleTerm,setRoleTerm]=useState(''); const [roleSuggestions,setRoleSuggestions]=useState<CatalogRole[]>([]);
-  const [saveName,setSaveName]=useState(''); const currentPage=pages[pageIndex]; const jobs=currentPage?.items||[];
+  const [saveName,setSaveName]=useState(''); const [savedSearches,setSavedSearches]=useState<SavedSearch[]>([]);const [catalogRoles,setCatalogRoles]=useState<CatalogRole[]>([]);
+  const currentPage=pages[pageIndex]; const jobs=currentPage?.items||[];
 
   async function fetchPage(active:SearchFilters,cursor?:string){
     const params=new URLSearchParams();
@@ -134,7 +135,8 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
     } catch(failure){setError(errorMessage(failure));} finally {setLoading(false);}
   }
 
-  useEffect(()=>{void search(emptySearchFilters());},[]);
+  async function loadSavedSearches(){setSavedSearches(await api<SavedSearch[]>('/me/saved-searches'));}
+  useEffect(()=>{void search(emptySearchFilters());void loadSavedSearches().catch(failure=>notify(errorMessage(failure)));void api<CatalogRole[]>('/catalog/roles?limit=50').then(setCatalogRoles);},[]);
   useEffect(()=>{
     if(roleTerm.trim().length<2){setRoleSuggestions([]);return;}
     const timer=window.setTimeout(()=>{void api<CatalogRole[]>(`/catalog/roles?q=${encodeURIComponent(roleTerm.trim())}&limit=10`)
@@ -171,12 +173,16 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
   }
   async function saveSearch(){
     if(!saveName.trim()){notify('Escribe un nombre para guardar esta búsqueda.');return;}
-    try {await api('/me/saved-searches',{method:'POST',body:JSON.stringify({name:saveName.trim(),criteria:criteria(filters)})});setSaveName('');notify('Búsqueda guardada.');}
+    try {await api('/me/saved-searches',{method:'POST',body:JSON.stringify({name:saveName.trim(),criteria:criteria(filters)})});setSaveName('');await loadSavedSearches();notify('Búsqueda guardada.');}
     catch(failure){notify(errorMessage(failure));}
   }
+  async function applySaved(item:SavedSearch){const c=item.criteria;const next:SearchFilters={query:c.query||'',roles:(c.roleFamilyIds||[]).map(id=>catalogRoles.find(role=>role.id===id)||{id,name:'Rol guardado'}),remoteModes:c.remoteModes||[],employmentTypes:c.employmentTypes||[],countryCode:c.countryCode||'',state:c.state||'',city:c.city||'',minimumMonthlySalary:c.minimumMonthlySalary?.toString()||'',publishedWithinDays:c.publishedWithinDays?.toString()||'',excludeEmployers:Boolean(c.excludeEmployers)};setFilters(next);await search(next);}
+  async function renameSaved(item:SavedSearch){const name=window.prompt('Nuevo nombre de la búsqueda',item.name)?.trim();if(!name||name===item.name)return;try{await api(`/me/saved-searches/${item.id}`,{method:'PUT',headers:{'If-Match':String(item.version)},body:JSON.stringify({name,criteria:item.criteria})});await loadSavedSearches();notify('Búsqueda renombrada.');}catch(failure){notify(errorMessage(failure));}}
+  async function deleteSaved(item:SavedSearch){if(!window.confirm(`¿Eliminar la búsqueda “${item.name}”?`))return;try{await api(`/me/saved-searches/${item.id}`,{method:'DELETE',headers:{'If-Match':String(item.version)}});await loadSavedSearches();notify('Búsqueda eliminada.');}catch(failure){notify(errorMessage(failure));}}
   function clear(){const next=emptySearchFilters();setFilters(next);void search(next);}
   const selectedActivity=selectedId?activity[selectedId]:undefined;
   return <section className="explore-page">
+    {savedSearches.length>0&&<section className="saved-searches"><div><h2>Búsquedas guardadas</h2><p>Recupera en un clic una combinación de filtros que utilizas con frecuencia.</p></div><div className="saved-search-list">{savedSearches.map(item=><article key={item.id}><strong>{item.name}</strong><div><button type="button" className="primary" onClick={()=>void applySaved(item)}>Aplicar</button><button type="button" onClick={()=>void renameSaved(item)}>Renombrar</button><button type="button" className="quiet" onClick={()=>void deleteSaved(item)}>Eliminar</button></div></article>)}</div></section>}
     <form className="explore-filters" onSubmit={event=>{event.preventDefault();void search();}}>
       <div className="filter-main"><label>Busca por rol, tecnología o empresa<input value={filters.query} onChange={event=>updateFilter('query',event.target.value)} placeholder="Java, React, empresa…"/></label><button className="primary">Aplicar filtros</button><button type="button" className="quiet" onClick={clear}>Limpiar</button></div>
       <details className="filter-details"><summary>Filtros avanzados</summary><div className="filter-grid">
