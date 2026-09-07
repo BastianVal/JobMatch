@@ -40,9 +40,12 @@ PostgreSQL almacena vacantes canónicas, sus publicaciones y la proyección de t
 
 El worker comparte consultas, procesa cinco fuentes de forma independiente y consolida publicaciones con reglas auditables de identidad, similitud y vigencia. El flujo local determinista, la API de actualización y las políticas operativas están en [`docs/phase-4.md`](docs/phase-4.md).
 
-## Importación de CV (Fase 5)
+## Perfil manual (Fase 5 retirada)
 
-PDF textuales y DOCX se almacenan con nombres internos aleatorios y se extraen en el worker. El usuario revisa cada propuesta y resuelve duplicados antes de una confirmación atómica que recalcula el perfil. El contrato, límites y prueba integral están en [`docs/phase-5.md`](docs/phase-5.md).
+La importación automática de CV se retiró del alcance de esta versión para mantener
+una operación ligera y predecible. Toda la trayectoria, educación, certificaciones,
+idiomas y habilidades se administran manualmente desde **Perfil**. La decisión y sus
+efectos de compatibilidad están documentados en [`docs/phase-5.md`](docs/phase-5.md).
 
 ## Matching y recomendaciones (Fase 6)
 
@@ -52,4 +55,4 @@ El motor `score-1` produce puntajes deterministas por seis componentes y conserv
 
 La aplicación registra impresiones por lote, deriva el indicador de vacante nueva y permite guardar, descartar y seguir una postulación hasta su resultado final. Las transiciones conservan historial, usan `If-Match` para concurrencia optimista e `Idempotency-Key` para reintentos seguros.
 
-La SPA React integra autenticación, perfil, CV, búsqueda, recomendaciones explicables y seguimiento, incluidos estados pendientes y errores recuperables. Consulta [`docs/phase-7.md`](docs/phase-7.md).
+La SPA React integra autenticación, perfil manual, búsqueda, recomendaciones explicables y seguimiento, incluidos estados pendientes y errores recuperables. Consulta [`docs/phase-7.md`](docs/phase-7.md).

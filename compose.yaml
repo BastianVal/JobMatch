@@ -47,8 +47,6 @@ services:
   api:
     <<: *backend
     command: ["--spring.profiles.active=api"]
-    volumes:
-      - cv_files:/var/lib/jobmatch/cv
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jobmatch}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-jobmatch}
@@ -69,8 +67,6 @@ services:
     command: ["--spring.profiles.active=worker"]
     cpus: 1.0
     mem_limit: 768m
-    volumes:
-      - cv_files:/var/lib/jobmatch/cv
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jobmatch}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-jobmatch}
@@ -130,4 +126,3 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
-  cv_files:

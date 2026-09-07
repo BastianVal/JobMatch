@@ -13,8 +13,6 @@
 - El backend rechaza familias inactivas, inexistentes o no seleccionables. Como
   compatibilidad de migración, un perfil puede conservar una familia histórica que
   ya tenía seleccionada, pero no puede agregarla a un perfil nuevo.
-- Lectura de los cinco CV activos más recientes dentro del perfil. La carga y revisión
-  se integrarán en esta misma página durante la Fase 7F.
 
 ## Contratos relevantes
 
@@ -23,7 +21,6 @@ GET /api/v1/me/profile
 PUT /api/v1/me/profile
 GET /api/v1/catalog/roles?q=java&limit=10
 GET /api/v1/catalog/skills?q=java&limit=10
-GET /api/v1/me/cv-documents
 ```
 
 `PUT /me/profile` conserva el bloqueo optimista mediante `If-Match`. Los UUID y nombres
@@ -39,4 +36,3 @@ perteneciente al mismo perfil.
 4. Los roles pueden quitarse y reordenarse; las prioridades enviadas son consecutivas.
 5. El formulario no admite más de diez roles.
 6. Tras guardar se vuelve a modo lectura y se muestra todo el contenido sin truncar.
-7. La lista de CV sólo devuelve documentos activos del usuario autenticado, hasta cinco.

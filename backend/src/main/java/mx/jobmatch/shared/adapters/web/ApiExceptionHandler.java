@@ -17,7 +17,6 @@ import mx.jobmatch.discovery.application.DiscoveryExceptions.ResourceNotFound;
 import mx.jobmatch.discovery.application.DiscoveryExceptions.SavedSearchLimitReached;
 import mx.jobmatch.ingestion.application.IngestionExceptions.InvalidRefresh;
 import mx.jobmatch.ingestion.application.IngestionExceptions.RefreshNotFound;
-import mx.jobmatch.cvimport.application.CvImportExceptions.*;
 import org.slf4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.net.URI;
 import java.util.Map;
@@ -120,37 +118,6 @@ public class ApiExceptionHandler {
     @ExceptionHandler(RefreshNotFound.class)
     ProblemDetail refreshNotFound() {
         return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
-    }
-
-    @ExceptionHandler({ImportNotFound.class, CandidateNotFound.class})
-    ProblemDetail cvImportNotFound() {
-        return problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "El recurso no existe.", null, false);
-    }
-
-    @ExceptionHandler({DuplicateFile.class, ActiveDocumentLimit.class})
-    ProblemDetail cvConflict(RuntimeException failure) {
-        return problem(HttpStatus.CONFLICT, failure instanceof DuplicateFile ? "DUPLICATE_CV" : "CV_LIMIT_REACHED",
-                failure.getMessage(), null, false);
-    }
-
-    @ExceptionHandler(DecisionConflict.class)
-    ProblemDetail decisionConflict() {
-        return problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "La propuesta cambió; vuelve a cargarla.", null, false);
-    }
-
-    @ExceptionHandler(ImportNotReady.class)
-    ProblemDetail importNotReady(ImportNotReady failure) {
-        return problem(HttpStatus.CONFLICT, "CV_IMPORT_NOT_READY", failure.getMessage(), null, false);
-    }
-
-    @ExceptionHandler(InvalidFile.class)
-    ProblemDetail invalidCv(InvalidFile failure) {
-        return problem(HttpStatus.BAD_REQUEST, "INVALID_CV_FILE", failure.getMessage(), null, false);
-    }
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    ProblemDetail cvTooLarge() {
-        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "CV_FILE_TOO_LARGE", "El CV supera el límite de 5 MB.", null, false);
     }
 
     @ExceptionHandler(InvalidCatalogReference.class)

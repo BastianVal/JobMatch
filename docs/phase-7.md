@@ -8,7 +8,7 @@
 - Historial inmutable de cada transición con estado anterior, estado nuevo, nota, versión y fecha.
 - Concurrencia optimista mediante `If-Match`; una versión obsoleta devuelve `409 VERSION_CONFLICT`.
 - Reintentos seguros mediante `Idempotency-Key`; reutilizar una clave con otro payload devuelve `409 IDEMPOTENCY_KEY_REUSED`.
-- SPA React responsiva con autenticación, recomendaciones, búsqueda, evidencia de matching, seguimiento, perfil e importación de CV.
+- SPA React responsiva con autenticación, recomendaciones, búsqueda, evidencia de matching, seguimiento y perfil manual.
 - Estados de carga, secciones vacías, reintento y recuperación de conflictos en el cliente.
 - Eliminación de cuenta incluye impresiones, seguimiento e historial.
 

@@ -11,9 +11,6 @@ type Skill={id:string;catalogSkillId?:string|null;customName?:string|null;name?:
 export type ProfileData={headline?:string;summary?:string;location?:string;seniority?:string;targetRoles:TargetRole[];preferences?:Preference|null;excludedEmployers:string[];trajectory:Trajectory[];education:Education[];certifications:Certification[];languages:Language[];skills:Skill[]};
 type Profile={id?:string;version:number;catalogVersion:number;data:ProfileData};
 type CatalogEntry={id:string;name:string};
-type CvDocument={id:string;originalFilename:string;createdAt:string;latestImportStatus:string};
-type CvRun={id:string;documentId:string;status:string;originalFilename:string;candidates:CvCandidate[];safeErrorCode?:string};
-type CvCandidate={id:string;type:string;proposal:Record<string,unknown>;decision:string;decisionVersion:number;duplicate?:{similarityScore:number;existingEntityType:string;resolution?:string}};
 
 const seniorities=['INTERN','JUNIOR','MID','SENIOR','LEAD','MANAGER','DIRECTOR'];
 const trajectoryTypes=['EMPLOYMENT','INTERNSHIP','TECHNICAL_SOCIAL_SERVICE','TECHNICAL_VOLUNTEERING','PERSONAL_PROJECT','OPEN_SOURCE','ACADEMIC_PROJECT','STUDY'];
@@ -28,7 +25,6 @@ const clone=<T,>(value:T):T=>structuredClone(value);
 export function ProfileView({notify}:{notify:(value:string)=>void}){
   const [saved,setSaved]=useState<Profile>();
   const [draft,setDraft]=useState<Profile>();
-  const [documents,setDocuments]=useState<CvDocument[]>([]);
   const [editing,setEditing]=useState(false);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
@@ -37,9 +33,9 @@ export function ProfileView({notify}:{notify:(value:string)=>void}){
   async function load(background=false){
     if(!background)setLoading(true);
     try{
-      const [profile,cvs]=await Promise.all([api<Profile>('/me/profile'),api<CvDocument[]>('/me/cv-documents')]);
+      const profile=await api<Profile>('/me/profile');
       const normalized={...profile,data:normalize(profile.data)};
-      setSaved(normalized);setDraft(clone(normalized));setDocuments(cvs);
+      setSaved(normalized);setDraft(clone(normalized));
     }catch(failure){notify(errorMessage(failure));}
     finally{if(!background)setLoading(false);}
   }
@@ -63,17 +59,15 @@ export function ProfileView({notify}:{notify:(value:string)=>void}){
   }
   return editing
     ? <ProfileEditor profile={currentDraft} setProfile={setDraft} errors={errors} saving={saving} onSave={save} onCancel={cancel}/>
-    : <ProfileRead profile={currentSaved} documents={documents} onEdit={beginEdit} notify={notify} onProfileChanged={()=>load(true)}/>;
+    : <ProfileRead profile={currentSaved} onEdit={beginEdit}/>;
 }
 
 function normalize(data:ProfileData):ProfileData{return {...data,targetRoles:data.targetRoles||[],excludedEmployers:data.excludedEmployers||[],trajectory:data.trajectory||[],education:data.education||[],certifications:data.certifications||[],languages:data.languages||[],skills:data.skills||[]};}
 
-function ProfileRead({profile,documents,onEdit,notify,onProfileChanged}:{profile:Profile;documents:CvDocument[];onEdit:()=>void;notify:(value:string)=>void;onProfileChanged:()=>Promise<void>}){
-  const [cvOpen,setCvOpen]=useState(false);
-  useEffect(()=>{if(!cvOpen)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setCvOpen(false);};document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close);},[cvOpen]);
+function ProfileRead({profile,onEdit}:{profile:Profile;onEdit:()=>void}){
   const d=profile.data,p=d.preferences;
   return <div className="profile-page">
-    <div className="profile-toolbar"><div><p className="profile-kicker">Perfil versión {profile.version}</p><p>Esta información alimenta tus recomendaciones.</p></div><div className="actions"><button type="button" onClick={()=>setCvOpen(true)}>Importar CV</button><button className="primary" onClick={onEdit}>Editar perfil</button></div></div>
+    <div className="profile-toolbar"><div><p className="profile-kicker">Perfil versión {profile.version}</p><p>Esta información alimenta tus recomendaciones.</p></div><button className="primary" onClick={onEdit}>Editar perfil</button></div>
     <section className="profile-hero"><div><span className="profile-avatar" aria-hidden="true">{(d.headline||'P').charAt(0).toUpperCase()}</span><div><h2>{text(d.headline,'Perfil profesional')}</h2><p>{[text(d.location,''),label(d.seniority)].filter(Boolean).join(' · ')||'Agrega tu ubicación y seniority'}</p></div></div><p className="profile-summary">{text(d.summary,'Agrega un resumen que explique tu experiencia, fortalezas y objetivos.')}</p></section>
     <div className="profile-columns">
       <div className="profile-main">
@@ -89,28 +83,8 @@ function ProfileRead({profile,documents,onEdit,notify,onProfileChanged}:{profile
         <ReadSection title="Empresas excluidas" empty="No tienes empresas excluidas."><div className="read-chips muted">{d.excludedEmployers.map(name=><span key={name}>{name}</span>)}</div></ReadSection>
       </div>
     </div>
-    {cvOpen&&<div className="modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setCvOpen(false)}}><div className="cv-modal" role="dialog" aria-modal="true" aria-labelledby="cv-modal-title"><div className="modal-head"><div><p className="profile-kicker">Perfil profesional</p><h2 id="cv-modal-title">Importar CV</h2></div><button type="button" className="quiet modal-close" aria-label="Cerrar" onClick={()=>setCvOpen(false)}>×</button></div><CvImportPanel documents={documents} notify={notify} onProfileChanged={onProfileChanged}/></div></div>}
   </div>;
 }
-
-function CvImportPanel({documents,notify,onProfileChanged}:{documents:CvDocument[];notify:(value:string)=>void;onProfileChanged:()=>Promise<void>}){
-  const [run,setRun]=useState<CvRun>();const [busy,setBusy]=useState(false);const [resolutions,setResolutions]=useState<Record<string,string>>({});
-  async function refresh(){if(!run)return;try{setRun(await api<CvRun>(`/me/cv-imports/${run.id}`));}catch(failure){notify(errorMessage(failure));}}
-  useEffect(()=>{if(!run||!['QUEUED','PROCESSING'].includes(run.status))return;const timer=window.setInterval(()=>void refresh(),2000);return()=>window.clearInterval(timer);},[run?.id,run?.status]);
-  async function upload(event:FormEvent<HTMLFormElement>){event.preventDefault();const input=event.currentTarget.elements.namedItem('cv') as HTMLInputElement;if(!input.files?.[0])return;const body=new FormData();body.append('file',input.files[0]);setBusy(true);try{setRun(await api<CvRun>('/me/cv-imports',{method:'POST',body}));notify('CV recibido; estamos extrayendo su información.');event.currentTarget.reset();await onProfileChanged();}catch(failure){notify(errorMessage(failure));}finally{setBusy(false);}}
-  async function decide(candidate:CvCandidate,decision:'ACCEPTED'|'SKIPPED',resolution?:string){if(!run)return;try{setRun(await api<CvRun>(`/me/cv-imports/${run.id}/candidates/${candidate.id}`,{method:'PUT',headers:{'If-Match':String(candidate.decisionVersion)},body:JSON.stringify({decision,duplicateResolution:decision==='SKIPPED'?(candidate.duplicate?'SKIP':null):(candidate.duplicate?resolution:null)})}));}catch(failure){notify(errorMessage(failure));await refresh();}}
-  async function confirm(){if(!run)return;setBusy(true);try{await api(`/me/cv-imports/${run.id}/confirm`,{method:'POST'});notify('Propuestas confirmadas y perfil actualizado.');await onProfileChanged();await refresh();}catch(failure){notify(errorMessage(failure));}finally{setBusy(false);}}
-  async function removeDocument(document:CvDocument){if(!window.confirm(`¿Eliminar “${document.originalFilename}”? La información ya confirmada en tu perfil se conservará.`))return;try{await api(`/me/cv-documents/${document.id}`,{method:'DELETE'});if(run?.documentId===document.id)setRun(undefined);await onProfileChanged();notify('CV eliminado. La información confirmada se conservó.');}catch(failure){notify(errorMessage(failure));}}
-  const ready=run?.status==='READY';const pending=run?.candidates.filter(candidate=>candidate.decision==='PENDING')||[];
-  return <section className="cv-panel"><div className="section-heading"><div><p>Revisa cada propuesta antes de modificar tu perfil. Puedes tener hasta cinco CV activos.</p></div><span>{documents.length}/5 CV</span></div>{documents.length<5?<form onSubmit={upload}><label className="dropzone">PDF textual o DOCX, máximo 5 MB<input name="cv" type="file" accept=".pdf,.docx" required/></label><button className="primary" disabled={busy}>{busy?'Subiendo…':'Importar y analizar CV'}</button></form>:<p className="notice">Alcanzaste el máximo de cinco CV activos. Elimina uno para importar otro.</p>}{run&&<div className="cv-run"><div className="job-top"><div><p className="meta">{run.originalFilename}</p><h3>{statusLabel(run.status)}</h3></div>{['QUEUED','PROCESSING'].includes(run.status)&&<span className="meta">Actualizando automáticamente…</span>}</div>{run.safeErrorCode&&<p className="notice">No fue posible extraer el documento: {run.safeErrorCode}</p>}{ready&&<><p className="meta">Acepta, omite o resuelve cada posible duplicado. Nada cambia en el perfil hasta confirmar.</p>{run.candidates.map(candidate=><article key={candidate.id} className="candidate"><div><strong>{candidateLabel(candidate.type)}</strong><dl className="proposal">{Object.entries(candidate.proposal).filter(([key,value])=>!technicalProposalKey(key)&&value!==null&&value!==''&&(!Array.isArray(value)||value.length)).map(([key,value])=><div key={key}><dt>{proposalLabel(key)}</dt><dd>{proposalValue(value)}</dd></div>)}</dl>{candidate.duplicate&&<p className="duplicate">Parece repetir información que ya existe en tu perfil ({Math.round(candidate.duplicate.similarityScore*100)}% de coincidencia). {candidate.duplicate.resolution?resolutionLabel(candidate.duplicate.resolution):'Elige cómo resolverlo.'}</p>}</div><span>{candidate.decision==='PENDING'?'Pendiente':candidate.decision==='ACCEPTED'?'Aceptada':'Omitida'}</span>{candidate.decision==='PENDING'&&<div className="actions">{candidate.duplicate&&<select aria-label={`Resolver duplicado de ${candidateLabel(candidate.type)}`} value={resolutions[candidate.id]||'KEEP_BOTH'} onChange={event=>setResolutions(values=>({...values,[candidate.id]:event.target.value}))}><option value="KEEP_BOTH">Conservar ambos</option><option value="REPLACE_EXISTING">Sustituir existente</option></select>}<button type="button" onClick={()=>void decide(candidate,'ACCEPTED',candidate.duplicate?(resolutions[candidate.id]||'KEEP_BOTH'):undefined)}>Aceptar</button><button type="button" onClick={()=>void decide(candidate,'SKIPPED')}>Omitir</button></div>}</article>)}{pending.length===0&&<button type="button" className="primary" disabled={busy} onClick={()=>void confirm()}>Confirmar cambios en perfil</button>}</>}</div>}{documents.length>0&&<div className="cv-library"><h3>CV importados</h3>{documents.map(document=><div className="document-row" key={document.id}><div><strong>{document.originalFilename}</strong><small>{new Date(document.createdAt).toLocaleDateString('es-MX')} · {statusLabel(document.latestImportStatus)}</small></div><div className="actions"><a className="button-link" href={`/api/v1/me/cv-documents/${document.id}/download`} download>Descargar</a><button type="button" className="quiet" onClick={()=>void removeDocument(document)}>Eliminar</button></div></div>)}</div>}</section>;
-}
-
-const statusLabel=(status:string)=>({QUEUED:'En cola',PROCESSING:'Analizando CV',READY:'Listo para revisar',CONFIRMED:'Información confirmada',FAILED:'No se pudo analizar',EXPIRED:'Importación expirada'}[status]||status);
-const candidateLabel=(type:string)=>({TRAJECTORY:'Trayectoria',EDUCATION:'Educación',CERTIFICATION:'Certificación',LANGUAGE:'Idioma',SKILL:'Habilidad'}[type]||type);
-const proposalLabel=(key:string)=>({title:'Puesto o proyecto',organization:'Empresa u organización',description:'Descripción',institution:'Institución',degree:'Grado',fieldOfStudy:'Área de estudio',name:'Nombre',issuer:'Emisor',code:'Código',proficiency:'Nivel',startYear:'Inicio',endYear:'Fin',current:'Actual'}[key]||key);
-const technicalProposalKey=(key:string)=>['id','catalogSkillId','evidenceTrajectoryIds','matchEligible','professionalMonths','weightedPracticalMonths'].includes(key);
-const proposalValue=(value:unknown):string=>Array.isArray(value)?value.map(proposalValue).join(', '):typeof value==='boolean'?(value?'Sí':'No'):typeof value==='string'?label(value):String(value);
-const resolutionLabel=(value:string)=>({KEEP_BOTH:'Se conservarán ambos',REPLACE_EXISTING:'Se sustituirá el existente',SKIP:'Se omitirá'}[value]||value);
 
 function ReadSection({title,empty,children}:{title:string;empty?:string;children?:ReactNode}){const present=Array.isArray(children)?children.length>0:Boolean(children);return <section className="profile-section"><h2>{title}</h2>{present?children:<p className="section-empty">{empty}</p>}</section>;}
 

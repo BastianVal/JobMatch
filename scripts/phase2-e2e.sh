@@ -94,10 +94,6 @@ for endpoint in target-roles trajectory skills; do
   test "$status" = '200'
 done
 
-status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/me/cv-documents")"
-test "$status" = '200'
-test "$(cat "$body")" = '[]'
-
 old_role_payload="$(printf '%s' "$payload" | sed 's/11100000-0000-0000-0000-000000000001/11000000-0000-0000-0000-000000000001/')"
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X PUT \
   -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $csrf" -H 'If-Match: "1"' \
