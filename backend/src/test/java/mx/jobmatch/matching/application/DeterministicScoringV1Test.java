@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,7 +52,7 @@ class DeterministicScoringV1Test {
                 });
     }
 
-    @Test void projectEvidenceContainsReadableTrajectoryNames(){
+    @Test void projectEvidenceNamesTheTrajectoryAndRelevantSkills(){
         UUID project=UUID.randomUUID();
         var data=new ProfileDraft("Backend",null,"CDMX","MID",
                 List.of(new ProfileDraft.TargetRole(UUID.randomUUID(),ROLE,1,"Software")),null,List.of(),
@@ -63,7 +64,8 @@ class DeterministicScoringV1Test {
 
         assertThat(result.reasons()).anySatisfy(reason->{
             assertThat(reason.component()).isEqualTo("RELEVANT_PROJECTS");
-            assertThat(reason.evidence()).containsEntry("trajectoryNames",List.of("API de pagos — Proyecto personal"));
+            assertThat(reason.evidence()).containsEntry("projects",List.of(Map.of(
+                    "name","API de pagos — Proyecto personal","skills",List.of("Java"))));
         });
     }
 

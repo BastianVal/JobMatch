@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Component
 public class DeterministicScoringV1 {
-    public static final String VERSION="score-3";
+    public static final String VERSION="score-5";
 
     public MatchEvaluation evaluate(ProfessionalProfile profile,JobDetail job,JobFacts facts){
         var reasons=new ArrayList<MatchEvaluation.Reason>();
@@ -51,8 +51,8 @@ public class DeterministicScoringV1 {
         var target=profile.targetRoles().stream().filter(role->role.roleFamilyId().equals(facts.roleFamilyId())).findFirst();
         if(target.isPresent()){
             reason(reasons,"ROLE_RESPONSIBILITIES","MATCH",null,map("role",target.get().name()),
-                    map("targetRole",target.get().name(),"priority",target.get().priority()),25,
-                    "La vacante coincide con tu rol objetivo: "+target.get().name()+".");return 25;
+                    map("targetRole",target.get().name()),25,
+                    "La vacante coincide con tu rol objetivo:");return 25;
         }
         reason(reasons,"ROLE_RESPONSIBILITIES","GAP",null,map("roleFamilyId",facts.roleFamilyId()),
                 map("targetRoleIds",profile.targetRoles().stream().map(ProfileDraft.TargetRole::roleFamilyId).toList()),0,
@@ -136,9 +136,11 @@ public class DeterministicScoringV1 {
                     "El perfil no contiene contextos de proyecto comparables.");return 7.5;
         }
         double points=Math.min(15,relevant*7.5);
+        var projects=relevantItems.stream().map(item->map("name",trajectoryName(item),"skills",profile.skills().stream()
+                .filter(skill->wanted.contains(skill.catalogSkillId())&&skill.evidenceTrajectoryIds().contains(item.id()))
+                .map(ProfileDraft.Skill::name).distinct().toList())).toList();
         reason(reasons,"RELEVANT_PROJECTS",relevant>0?"MATCH":"GAP",null,map("requiredSkills",wanted),
-                map("trajectoryNames",relevantItems.stream().map(DeterministicScoringV1::trajectoryName).toList()),points,
-                relevant>0?"Hay proyectos con evidencia de tecnologías relevantes.":"No hay proyectos con evidencia relevante.");return points;
+                map("projects",projects),points,relevant>0?"Hay proyectos con evidencia de tecnologías relevantes:":"No hay proyectos con evidencia relevante.");return points;
     }
 
     private double solidity(ProfileDraft profile,JobDetail job,List<MatchEvaluation.Reason> reasons){
