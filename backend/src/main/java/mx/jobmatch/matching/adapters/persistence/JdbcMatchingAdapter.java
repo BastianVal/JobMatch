@@ -107,22 +107,26 @@ public class JdbcMatchingAdapter implements MatchingRepository {
 
     @Override public List<UUID> recommendationCandidates(UUID accountId,int maximum){
         return jdbc.sql("""
-                SELECT DISTINCT job.public_id,MIN(target.priority) priority,job.published_at
-                FROM iam.account account JOIN profile.professional_profile profile ON profile.account_id=account.id
-                JOIN profile.target_role target ON target.profile_id=profile.id
-                JOIN jobs.canonical_job job ON job.role_family_id=target.role_family_id
-                JOIN jobs.employer employer ON employer.id=job.employer_id
-                LEFT JOIN profile.profile_preference preference ON preference.profile_id=profile.id
-                WHERE account.public_id=:account AND job.status='ACTIVE'
-                  AND NOT EXISTS(SELECT 1 FROM tracking.user_job tracked
-                    WHERE tracked.account_id=account.id AND tracked.canonical_job_id=job.id AND tracked.state='DISCARDED')
-                  AND NOT EXISTS(SELECT 1 FROM profile.excluded_employer excluded WHERE excluded.profile_id=profile.id
-                    AND excluded.employer_name_normalized=employer.name_normalized)
-                  AND (preference.remote_mode IS NULL OR preference.remote_mode='ANY' OR preference.remote_mode=job.remote_mode)
-                  AND (preference.employment_type IS NULL OR preference.employment_type='ANY' OR preference.employment_type=job.employment_type)
-                  AND (preference.minimum_monthly_salary IS NULL OR
-                    (job.salary_max_monthly IS NOT NULL AND job.salary_max_monthly>=preference.minimum_monthly_salary))
-                GROUP BY job.public_id,job.published_at ORDER BY priority,job.published_at DESC,job.public_id DESC LIMIT :maximum
+                WITH candidates AS (
+                  SELECT job.public_id,target.priority,job.published_at,
+                    row_number() OVER(PARTITION BY target.role_family_id ORDER BY job.published_at DESC,job.public_id DESC) role_rank
+                  FROM iam.account account JOIN profile.professional_profile profile ON profile.account_id=account.id
+                  JOIN profile.target_role target ON target.profile_id=profile.id
+                  JOIN jobs.canonical_job job ON job.role_family_id=target.role_family_id
+                  JOIN jobs.employer employer ON employer.id=job.employer_id
+                  LEFT JOIN profile.profile_preference preference ON preference.profile_id=profile.id
+                  WHERE account.public_id=:account AND job.status='ACTIVE'
+                    AND NOT EXISTS(SELECT 1 FROM tracking.user_job tracked
+                      WHERE tracked.account_id=account.id AND tracked.canonical_job_id=job.id AND tracked.state='DISCARDED')
+                    AND NOT EXISTS(SELECT 1 FROM profile.excluded_employer excluded WHERE excluded.profile_id=profile.id
+                      AND excluded.employer_name_normalized=employer.name_normalized)
+                    AND (preference.remote_mode IS NULL OR preference.remote_mode='ANY' OR preference.remote_mode=job.remote_mode)
+                    AND (preference.employment_type IS NULL OR preference.employment_type='ANY' OR preference.employment_type=job.employment_type)
+                    AND (preference.minimum_monthly_salary IS NULL OR
+                      (job.salary_max_monthly IS NOT NULL AND job.salary_max_monthly>=preference.minimum_monthly_salary))
+                )
+                SELECT public_id FROM candidates WHERE role_rank<=:maximum
+                ORDER BY priority,role_rank,published_at DESC,public_id DESC
                 """).param("account",accountId).param("maximum",maximum).query((rs,row)->rs.getObject("public_id",UUID.class)).list();
     }
 

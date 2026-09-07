@@ -13,8 +13,11 @@
   salario mínimo, seniority, experiencia, habilidades, idiomas y empresas excluidas.
 - Sólo se consideran vacantes activas. Una vacante `DISCARDED` se excluye tanto del
   cálculo como de una proyección que ya hubiera sido generada.
-- Se persisten los 500 mejores resultados y el desempate incorpora la prioridad del
-  rol antes de los criterios estables restantes.
+- Se recuperan hasta 2,000 candidatas por cada rol objetivo, no 2,000 para el perfil
+  completo. Los 500 resultados persistidos se intercalan entre las familias con
+  candidatas, respetando la prioridad de los roles y el puntaje dentro de cada una.
+- V14 y V15 invalidan las proyecciones derivadas con el límite y orden anteriores;
+  el worker las reconstruye sin modificar el perfil del usuario.
 
 ## Compatibilidad y catálogo
 
@@ -45,3 +48,5 @@ recomendaciones de dos versiones del perfil.
 - `phase2-e2e.sh`: catálogo, guardado del perfil, bloqueo optimista y validación.
 - `phase6-e2e.sh`: facts, evidencias, caché versionado, recomendación por rol,
   actualización asíncrona, descarte y exclusión de empresa sobre PostgreSQL real.
+- Verificación local con dos roles: los primeros diez resultados alternan
+  `Desarrollador Frontend` y `Desarrollador Java`.
