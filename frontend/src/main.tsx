@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useRef, useState } from 'react';
+import React, { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, errorMessage, resetCsrf } from './api';
 import { ProfileView } from './profile';
@@ -56,7 +56,7 @@ function Auth({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
 type View = 'recommendations'|'search'|'tracking'|'profile';
 function Workspace({ account, onLogout }: { account: Account; onLogout: () => void }) {
   const [view, setView] = useState<View>('recommendations'); const [notice, setNotice] = useState<Notice>(); const noticeId=useRef(0);
-  const notify=(message:string)=>{const normalized=message.trim();if(normalized)setNotice({id:++noticeId.current,message:normalized});};
+  const notify=useCallback((message:string)=>{const normalized=message.trim();if(normalized)setNotice({id:++noticeId.current,message:normalized});},[]);
   useEffect(()=>{if(!notice)return;const timer=window.setTimeout(()=>setNotice(undefined),5000);return()=>window.clearTimeout(timer);},[notice?.id]);
   function navigate(next:View){setView(next);setNotice(undefined);}
   async function logout() { await api('/auth/logout', { method:'POST' }); resetCsrf(); onLogout(); }
@@ -81,14 +81,8 @@ function JobsView({ notify }: { notify:(value:string)=>void }) {
   }
   useEffect(()=>{ void load(); },[]);
   useEffect(()=>{if(recommendationStatus!=='UPDATING')return;const timer=setInterval(()=>void load(true),2000);return()=>clearInterval(timer);},[recommendationStatus]);
-  useEffect(()=>{
-    if(loading||!jobs.length)return;
-    const ids=jobs.map(job=>job.jobId||job.id!).filter(Boolean);
-    const frame=requestAnimationFrame(()=>{void api('/me/job-impressions',{method:'POST',body:JSON.stringify({jobIds:ids})}).then(()=>setActivity(values=>markViewed(values,ids))).catch(failure=>notify(errorMessage(failure)));});
-    return()=>cancelAnimationFrame(frame);
-  },[loading,jobs]);
   useEffect(()=>{if(!jobs.length){setSelectedId(undefined);return;}setSelectedId(current=>jobs.some(job=>(job.jobId||job.id)===current)?current:(jobs[0].jobId||jobs[0].id));},[jobs]);
-  useEffect(()=>{if(!selectedId){setDetail(undefined);return;}let cancelled=false;setDetailLoading(true);void api<JobDetail>(`/jobs/${selectedId}`).then(result=>{if(!cancelled)setDetail(result);}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));}).finally(()=>{if(!cancelled)setDetailLoading(false);});return()=>{cancelled=true;};},[selectedId,notify]);
+  useEffect(()=>{if(!selectedId){setDetail(undefined);return;}let cancelled=false;setDetailLoading(true);void api<JobDetail>(`/jobs/${selectedId}`).then(result=>{if(cancelled)return;setDetail(result);void api('/me/job-impressions',{method:'POST',body:JSON.stringify({jobIds:[selectedId]})}).then(()=>{if(!cancelled)setActivity(values=>markViewed(values,[selectedId]));}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));});}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));}).finally(()=>{if(!cancelled)setDetailLoading(false);});return()=>{cancelled=true;};},[selectedId,notify]);
   async function refreshActivity(jobId:string){const found=await api<Activity[]>(`/me/job-activity?jobId=${jobId}`);setActivity(values=>({...values,[jobId]:found[0]}));}
   async function transition(jobId:string, state:TrackingState) {
     const current=activity[jobId];
@@ -153,18 +147,7 @@ function ExploreView({ notify }: { notify:(value:string)=>void }) {
       .catch(()=>setRoleSuggestions([]));},250);
     return()=>window.clearTimeout(timer);
   },[roleTerm,filters.roles]);
-  useEffect(()=>{
-    if(!selectedId){setDetail(undefined);return;}
-    let cancelled=false;setDetailLoading(true);
-    void api<JobDetail>(`/jobs/${selectedId}`).then(result=>{if(!cancelled)setDetail(result);}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));}).finally(()=>{if(!cancelled)setDetailLoading(false);});
-    return()=>{cancelled=true;};
-  },[selectedId,notify]);
-  useEffect(()=>{
-    if(loading||!jobs.length)return;
-    const ids=jobs.map(job=>job.id).filter((id):id is string=>Boolean(id));
-    const frame=requestAnimationFrame(()=>{void api('/me/job-impressions',{method:'POST',body:JSON.stringify({jobIds:ids})}).then(()=>setActivity(values=>markViewed(values,ids))).catch(failure=>notify(errorMessage(failure)));});
-    return()=>cancelAnimationFrame(frame);
-  },[loading,jobs,notify]);
+  useEffect(()=>{if(!selectedId){setDetail(undefined);return;}let cancelled=false;setDetailLoading(true);void api<JobDetail>(`/jobs/${selectedId}`).then(result=>{if(cancelled)return;setDetail(result);void api('/me/job-impressions',{method:'POST',body:JSON.stringify({jobIds:[selectedId]})}).then(()=>{if(!cancelled)setActivity(values=>markViewed(values,[selectedId]));}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));});}).catch(failure=>{if(!cancelled)notify(errorMessage(failure));}).finally(()=>{if(!cancelled)setDetailLoading(false);});return()=>{cancelled=true;};},[selectedId,notify]);
 
   function updateFilter<K extends keyof SearchFilters>(key:K,value:SearchFilters[K]){setFilters(current=>({...current,[key]:value}));}
   function toggle(key:'remoteModes'|'employmentTypes',value:string){setFilters(current=>({...current,[key]:current[key].includes(value)?current[key].filter(item=>item!==value):[...current[key],value]}));}
