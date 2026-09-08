@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -102,11 +103,24 @@ public final class GreenhouseConnectorAdapter implements ConnectorPort {
         if (blank(raw)) return new Location(configuredCountry == null ? "MX" : configuredCountry, null, null);
         String[] parts = raw.split("\\s*,\\s*");
         String last = parts[parts.length - 1].strip().toLowerCase(Locale.ROOT);
-        String country = COUNTRIES.get(last);
+        String country = detectedCountry(raw, last);
         int cityEnd = country == null ? parts.length : parts.length - 1;
         String city = cityEnd == 0 ? raw : parts[0].strip();
         String state = cityEnd > 1 ? parts[1].strip() : null;
         return new Location(country == null ? (configuredCountry == null ? "MX" : configuredCountry) : country, state, city);
+    }
+    private static String detectedCountry(String raw, String lastSegment) {
+        String exact = COUNTRIES.get(lastSegment);
+        if (exact != null) return exact;
+        // Some Greenhouse boards publish values such as "Argentina (Remote)".
+        // Check country names as complete normalized words before trusting the board default.
+        String normalized = " " + raw.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}]+", " ").strip() + " ";
+        return COUNTRIES.entrySet().stream()
+                .sorted(Comparator.comparingInt((Map.Entry<String, String> entry) -> entry.getKey().length()).reversed())
+                .filter(entry -> normalized.contains(" " + entry.getKey() + " "))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
     }
     private static String htmlToText(String html) {
         if (html == null) return null;
