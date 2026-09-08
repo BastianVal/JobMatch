@@ -150,6 +150,15 @@ perfil, sesiones, impresiones, seguimiento ni historial asociado.
 `scripts/phase1-e2e.sh` comprueba además que una cuenta eliminada no puede iniciar
 una nueva sesión con sus credenciales anteriores.
 
+Como comprobación complementaria del proxy, ejecuta:
+
+```sh
+BASE_URL=http://localhost:8090 sh scripts/phase8-security-e2e.sh
+```
+
+La prueba valida CSP, `nosniff`, política de referencia, ausencia de CORS para un
+origen arbitrario y que `/actuator/prometheus` responde `404` desde el proxy.
+
 ## Pendiente de las siguientes entregas de Fase 8
 
 1. Ejecutar la carga contra un staging con datos representativos y revisar índices
