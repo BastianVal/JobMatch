@@ -16,8 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ConnectorContractTest {
     @Test
     void everyConnectorProducesTheCanonicalRawContract() {
-        List<ConnectorPort> connectors = List.of(new JoobleConnectorAdapter(), new AdzunaConnectorAdapter(),
-                new LeverConnectorAdapter(), new AshbyConnectorAdapter());
+        List<ConnectorPort> connectors = List.of(new JoobleConnectorAdapter(), new AdzunaConnectorAdapter());
         var query = new ConnectorQuery(UUID.randomUUID(), "Backend", "México", null);
 
         assertThat(connectors).allSatisfy(connector -> {
@@ -67,6 +66,43 @@ class ConnectorContractTest {
         assertThat(page.postings()).singleElement().satisfies(posting -> {
             assertThat(posting.externalId()).isEqualTo("greenhouse:cookunity:2");
             assertThat(posting.countryCode()).isEqualTo("MX");
+        });
+    }
+
+    @Test
+    void leverNormalizesMexicanPostingsAndSkipsForeignLocations() throws Exception {
+        String payload = """
+                [{"id":"mx-1","text":"Backend Engineer","hostedUrl":"https://jobs.lever.co/acme/mx-1",
+                "descriptionPlain":"Java APIs","createdAt":1760000000000,
+                "categories":{"location":"Ciudad de México, Mexico","commitment":"Full-time"}},
+                {"id":"ar-1","text":"Foreign Engineer","hostedUrl":"https://jobs.lever.co/acme/ar-1",
+                "categories":{"location":"Buenos Aires, Argentina"}}]""";
+        var query = new ConnectorQuery(UUID.randomUUID(), null, null, null, "acme", "Acme", "MX");
+        var page = LeverConnectorAdapter.parse(payload, query, new ObjectMapper());
+
+        assertThat(page.postings()).singleElement().satisfies(posting -> {
+            assertThat(posting.externalId()).isEqualTo("lever:acme:mx-1");
+            assertThat(posting.countryCode()).isEqualTo("MX");
+            assertThat(posting.employmentType()).isEqualTo("FULL_TIME");
+        });
+    }
+
+    @Test
+    void ashbyNormalizesMexicanPostingsAndSkipsForeignLocations() throws Exception {
+        String payload = """
+                {"jobs":[{"id":"mx-1","title":"Platform Engineer","jobUrl":"https://jobs.ashbyhq.com/acme/mx-1",
+                "descriptionHtml":"<p>Docker</p>","isListed":true,"isRemote":true,"employmentType":"FullTime",
+                "publishedAt":"2026-09-01T12:00:00Z","location":"Ciudad de México",
+                "address":{"postalAddress":{"addressCountry":"Mexico"}}},
+                {"id":"br-1","title":"Foreign Engineer","jobUrl":"https://jobs.ashbyhq.com/acme/br-1",
+                "isListed":true,"location":"Sao Paulo","address":{"postalAddress":{"addressCountry":"Brazil"}}}]}""";
+        var query = new ConnectorQuery(UUID.randomUUID(), null, null, null, "acme", "Acme", "MX");
+        var page = AshbyConnectorAdapter.parse(payload, query, new ObjectMapper());
+
+        assertThat(page.postings()).singleElement().satisfies(posting -> {
+            assertThat(posting.externalId()).isEqualTo("ashby:acme:mx-1");
+            assertThat(posting.countryCode()).isEqualTo("MX");
+            assertThat(posting.remoteMode()).isEqualTo("REMOTE");
         });
     }
 

@@ -42,9 +42,14 @@ public class ConnectorSyncTaskHandler implements BackgroundTaskHandler {
         Payload payload = read(task.payload());
         var query = repository.findQuery(payload.queryId()).orElseThrow();
         UUID runId = repository.startRun(payload.queryId(), payload.refreshId());
+        boolean permit = repository.acquireRequestPermit(query.sourceKey(), payload.queryId(), task.publicId(), Instant.now());
+        if (!permit) {
+            // A quota, lease or open circuit rejected this attempt before an outbound request was made.
+            // Counting that as a source failure used to extend an already-open circuit indefinitely.
+            repository.failRun(runId, "SOURCE_UNAVAILABLE");
+            return;
+        }
         try {
-            if (!repository.acquireRequestPermit(query.sourceKey(), payload.queryId(), task.publicId(), Instant.now()))
-                throw new ConnectorFailure("SOURCE_UNAVAILABLE", true);
             ConnectorPort connector = connectors.stream().filter(item -> item.sourceKey().equals(query.sourceKey()))
                     .findFirst().orElseThrow(() -> new ConnectorFailure("CONNECTOR_NOT_CONFIGURED", false));
             var page = connector.fetch(query.query());

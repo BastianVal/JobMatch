@@ -17,10 +17,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /** Public Greenhouse Job Board API adapter. Board keys only originate in the managed registry. */
 @Component
@@ -70,15 +68,15 @@ public final class GreenhouseConnectorAdapter implements ConnectorPort {
         if (!jobs.isArray()) throw new ConnectorFailure("GREENHOUSE_INVALID_RESPONSE", true);
         List<RawPosting> postings = new ArrayList<>();
         for (JsonNode job : jobs) {
-            String id = text(job, "id");
-            String url = text(job, "absolute_url");
-            String title = text(job, "title");
-            if (blank(id) || blank(url) || blank(title)) continue;
-            String description = htmlToText(text(job, "content"));
-            if (blank(description)) description = title;
-            Location location = location(job.path("location").path("name").asText(null), query.countryCode());
+            String id = AtsConnectorSupport.text(job, "id");
+            String url = AtsConnectorSupport.text(job, "absolute_url");
+            String title = AtsConnectorSupport.text(job, "title");
+            if (AtsConnectorSupport.blank(id) || AtsConnectorSupport.blank(url) || AtsConnectorSupport.blank(title)) continue;
+            String description = AtsConnectorSupport.htmlToText(AtsConnectorSupport.text(job, "content"));
+            if (AtsConnectorSupport.blank(description)) description = title;
+            AtsConnectorSupport.Location location = AtsConnectorSupport.location(job.path("location").path("name").asText(null), null);
             if (!"MX".equals(location.countryCode())) continue;
-            String fullText = (title + " " + description + " " + value(location.city())).toLowerCase(Locale.ROOT);
+            String fullText = (title + " " + description + " " + AtsConnectorSupport.value(location.city())).toLowerCase(Locale.ROOT);
             postings.add(new RawPosting("greenhouse:" + board + ":" + id, url, title,
                     query.employerName() == null ? board : query.employerName(), description,
                     location.countryCode(), location.state(), location.city(),
@@ -90,76 +88,13 @@ public final class GreenhouseConnectorAdapter implements ConnectorPort {
 
     private static String boardKey(ConnectorQuery query) {
         String board = query.boardKey();
-        if (blank(board) || !board.matches("[a-zA-Z0-9_-]{1,200}"))
+        if (AtsConnectorSupport.blank(board) || !board.matches("[a-zA-Z0-9_-]{1,200}"))
             throw new ConnectorFailure("GREENHOUSE_BOARD_NOT_CONFIGURED", false);
         return board;
     }
     private static Instant published(JsonNode job) {
-        String updated = text(job, "updated_at");
+        String updated = AtsConnectorSupport.text(job, "updated_at");
         try { return updated == null ? Instant.now() : Instant.parse(updated); }
         catch (Exception invalid) { return Instant.now(); }
     }
-    private static Location location(String raw, String configuredCountry) {
-        if (blank(raw)) return new Location(configuredCountry == null ? "MX" : configuredCountry, null, null);
-        String[] parts = raw.split("\\s*,\\s*");
-        String last = parts[parts.length - 1].strip().toLowerCase(Locale.ROOT);
-        String country = detectedCountry(raw, last);
-        int cityEnd = country == null ? parts.length : parts.length - 1;
-        String city = cityEnd == 0 ? raw : parts[0].strip();
-        String state = cityEnd > 1 ? parts[1].strip() : null;
-        return new Location(country == null ? (configuredCountry == null ? "MX" : configuredCountry) : country, state, city);
-    }
-    private static String detectedCountry(String raw, String lastSegment) {
-        String exact = COUNTRIES.get(lastSegment);
-        if (exact != null) return exact;
-        // Some Greenhouse boards publish values such as "Argentina (Remote)".
-        // Check country names as complete normalized words before trusting the board default.
-        String normalized = " " + raw.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}]+", " ").strip() + " ";
-        return COUNTRIES.entrySet().stream()
-                .sorted(Comparator.comparingInt((Map.Entry<String, String> entry) -> entry.getKey().length()).reversed())
-                .filter(entry -> normalized.contains(" " + entry.getKey() + " "))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
-    }
-    private static String htmlToText(String html) {
-        if (html == null) return null;
-        String decoded = html;
-        // Greenhouse may encode rich text twice (for example, &amp;lt;p&amp;gt;).
-        // Decode a bounded number of times before interpreting the markup.
-        for (int attempt = 0; attempt < 3; attempt++) {
-            String next = decodeEntities(decoded);
-            if (next.equals(decoded)) break;
-            decoded = next;
-        }
-        return decoded
-                .replaceAll("(?is)<(script|style)[^>]*>.*?</\\1>", " ")
-                .replaceAll("(?is)<h[1-6][^>]*>", "\n\n")
-                .replaceAll("(?is)</h[1-6]>", "\n")
-                .replaceAll("(?is)<br\\s*/?>", "\n")
-                .replaceAll("(?is)<li[^>]*>", "\n• ")
-                .replaceAll("(?is)</(p|div|ul|ol)>", "\n")
-                .replaceAll("(?is)<[^>]+>", " ").replaceAll("[ \\t]+", " ")
-                .replaceAll("(?m)^[ \\t]+|[ \\t]+$", "")
-                .replaceAll("\\n(?:[ \\t]*\\n)+", "\n\n")
-                .replaceAll("\\n{3,}", "\n\n").trim();
-    }
-    private static String decodeEntities(String value) {
-        return value.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-                .replace("&#39;", "'").replace("&nbsp;", " ").replace("&amp;", "&");
-    }
-    private static String text(JsonNode node, String name) {
-        JsonNode value = node.path(name);
-        return value.isValueNode() && !value.isNull() ? value.asText() : null;
-    }
-    private static String value(String value) { return value == null ? "" : value; }
-    private static boolean blank(String value) { return value == null || value.isBlank(); }
-    private record Location(String countryCode, String state, String city) {}
-    private static final Map<String, String> COUNTRIES = Map.ofEntries(
-            Map.entry("argentina", "AR"), Map.entry("méxico", "MX"), Map.entry("mexico", "MX"),
-            Map.entry("united states", "US"), Map.entry("usa", "US"), Map.entry("canada", "CA"),
-            Map.entry("brazil", "BR"), Map.entry("brasil", "BR"), Map.entry("colombia", "CO"),
-            Map.entry("chile", "CL"), Map.entry("spain", "ES"), Map.entry("españa", "ES"),
-            Map.entry("united kingdom", "GB"), Map.entry("uk", "GB"), Map.entry("india", "IN"),
-            Map.entry("germany", "DE"), Map.entry("france", "FR"), Map.entry("australia", "AU"));
 }
