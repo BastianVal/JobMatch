@@ -52,6 +52,25 @@ class ConnectorContractTest {
     }
 
     @Test
+    void greenhouseExcludesExplicitForeignLocationsWithRemoteQualifiers() throws Exception {
+        String payload = """
+                {"jobs":[
+                {"id":1,"absolute_url":"https://boards.greenhouse.io/cookunity/jobs/1","title":"Foreign role",
+                "content":"Description","updated_at":"2026-09-01T12:00:00Z","location":{"name":"Argentina (Remote)"}},
+                {"id":2,"absolute_url":"https://boards.greenhouse.io/cookunity/jobs/2","title":"Mexican role",
+                "content":"Description","updated_at":"2026-09-01T12:00:00Z","location":{"name":"Ciudad de México (Remote), Mexico"}}
+                ]}""";
+        var query = new ConnectorQuery(UUID.randomUUID(), null, null, null, "cookunity", "CookUnity", "MX");
+
+        var page = GreenhouseConnectorAdapter.parse(payload, query, new ObjectMapper());
+
+        assertThat(page.postings()).singleElement().satisfies(posting -> {
+            assertThat(posting.externalId()).isEqualTo("greenhouse:cookunity:2");
+            assertThat(posting.countryCode()).isEqualTo("MX");
+        });
+    }
+
+    @Test
     void simulatedFailureIsIsolatedToRequestedSource() {
         var query = new ConnectorQuery(UUID.randomUUID(), "FAIL_JOOBLE", null, null);
         assertThatThrownBy(() -> new JoobleConnectorAdapter().fetch(query)).isInstanceOf(ConnectorFailure.class);
