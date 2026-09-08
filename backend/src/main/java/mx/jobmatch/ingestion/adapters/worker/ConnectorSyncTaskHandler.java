@@ -9,7 +9,10 @@ import mx.jobmatch.operations.application.BackgroundTaskHandler;
 import mx.jobmatch.operations.application.NonRetryableTaskException;
 import mx.jobmatch.operations.domain.BackgroundTask;
 import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.UncategorizedSQLException;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +21,7 @@ import java.util.UUID;
 @Profile("worker")
 @Component
 public class ConnectorSyncTaskHandler implements BackgroundTaskHandler {
+    private static final Logger log = LoggerFactory.getLogger(ConnectorSyncTaskHandler.class);
     private final IngestionRepository repository;
     private final IngestionService ingestion;
     private final List<ConnectorPort> connectors;
@@ -55,6 +59,10 @@ public class ConnectorSyncTaskHandler implements BackgroundTaskHandler {
             if (!failure.retryable()) throw new NonRetryableTaskException(failure.safeCode());
             throw failure;
         } catch (RuntimeException failure) {
+            String sqlState = failure instanceof UncategorizedSQLException sql
+                    ? sql.getSQLException().getSQLState() : "n/a";
+            log.warn("Connector pipeline failed: source={}, type={}, sqlState={}", query.sourceKey(),
+                    failure.getClass().getSimpleName(), sqlState);
             repository.sourceFailed(query.sourceKey(), Instant.now());
             repository.failRun(runId, "CONNECTOR_PIPELINE_FAILED");
             if (payload.refreshId() != null && task.attempts() >= 3) repository.connectorFailed(payload.refreshId());

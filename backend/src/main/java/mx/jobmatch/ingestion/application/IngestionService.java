@@ -45,7 +45,6 @@ public class IngestionService {
         return repository.findRefresh(accountId, refreshId).orElseThrow(IngestionExceptions.RefreshNotFound::new);
     }
 
-    @Transactional
     public IngestionRepository.Counts ingestPage(UUID runId, String sourceKey, ConnectorPage page) {
         var counts = new IngestionRepository.Counts(0, 0, 0, 0, 0, 0);
         for (var raw : page.postings()) {

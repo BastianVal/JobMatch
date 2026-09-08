@@ -24,6 +24,7 @@ import static mx.jobmatch.ingestion.application.IngestionExceptions.InvalidRefre
 @Repository
 public class JdbcIngestionAdapter implements IngestionRepository {
     private static final List<String> SOURCES = List.of("JOOBLE", "ADZUNA", "GREENHOUSE", "LEVER", "ASHBY");
+    private static final List<String> OFFICIAL_BOARD_SOURCES = List.of("GREENHOUSE", "LEVER", "ASHBY");
     private final JdbcClient jdbc;
     private final CatalogRoleResolver roles;
 
@@ -95,25 +96,31 @@ public class JdbcIngestionAdapter implements IngestionRepository {
     @Override
     public Optional<QuerySource> findQuery(UUID queryId) {
         return jdbc.sql("""
-                SELECT query.public_id, query.role_query, query.location_query, source.source_key
+                SELECT query.public_id, query.role_query, query.location_query, source.source_key,
+                       board.board_key, board.employer_name, board.country_code
                 FROM ingestion.connector_query query JOIN jobs.source source ON source.id=query.source_id
+                LEFT JOIN ingestion.public_job_board board ON board.id=query.board_id
                 WHERE query.public_id=:id AND query.enabled
                 """).param("id", queryId).query((rs, n) -> new QuerySource(new ConnectorQuery(
                         rs.getObject("public_id", UUID.class), rs.getString("role_query"),
-                        rs.getString("location_query"), null), rs.getString("source_key"))).optional();
+                        rs.getString("location_query"), null, rs.getString("board_key"),
+                        rs.getString("employer_name"), rs.getString("country_code")), rs.getString("source_key"))).optional();
     }
 
     @Override
     public List<QuerySource> findDueQueries(int limit) {
         return jdbc.sql("""
-                SELECT query.public_id, query.role_query, query.location_query, source.source_key
+                SELECT query.public_id, query.role_query, query.location_query, source.source_key,
+                       board.board_key, board.employer_name, board.country_code
                 FROM ingestion.connector_query query JOIN jobs.source source ON source.id=query.source_id
+                LEFT JOIN ingestion.public_job_board board ON board.id=query.board_id
                 WHERE query.enabled AND query.next_scheduled_at<=now()
-                  AND EXISTS (SELECT 1 FROM ingestion.query_demand demand WHERE demand.connector_query_id=query.id)
+                  AND (board.enabled OR EXISTS (SELECT 1 FROM ingestion.query_demand demand WHERE demand.connector_query_id=query.id))
                 ORDER BY query.next_scheduled_at, query.id LIMIT :limit
                 """).param("limit", limit).query((rs, n) -> new QuerySource(new ConnectorQuery(
                         rs.getObject("public_id", UUID.class), rs.getString("role_query"),
-                        rs.getString("location_query"), null), rs.getString("source_key"))).list();
+                        rs.getString("location_query"), null, rs.getString("board_key"),
+                        rs.getString("employer_name"), rs.getString("country_code")), rs.getString("source_key"))).list();
     }
 
     @Override
@@ -242,6 +249,7 @@ public class JdbcIngestionAdapter implements IngestionRepository {
     }
 
     @Override
+    @Transactional
     public UpsertResult upsert(UUID runId, NormalizedPosting p) {
         SourceRow source = jdbc.sql("SELECT id, public_id FROM jobs.source WHERE source_key=:key")
                 .param("key", p.sourceKey()).query((rs,n)->new SourceRow(rs.getLong("id"),rs.getObject("public_id",UUID.class))).single();
@@ -260,6 +268,7 @@ public class JdbcIngestionAdapter implements IngestionRepository {
             jdbc.sql("UPDATE jobs.job_source_link SET active=true WHERE source_posting_id=:posting")
                     .param("posting", existing.get().postingId()).update();
             updateClassification(existing.get().jobId(), p);
+            updateJobDetails(existing.get().jobId(), p);
             rebuildSearch(existing.get().jobId());
             recordPayload(runId, source.id(), existing.get().postingId(), p);
             event(existing.get().jobPublicId(), "UPDATED");
@@ -276,8 +285,9 @@ public class JdbcIngestionAdapter implements IngestionRepository {
         JobRow job = merge ? new JobRow(choice.candidate().internalId(), choice.publicId())
                 : createJob(p, employerId, uncertain ? p.identityKey()+"|"+p.sourceKey()+"|"+p.externalId() : p.identityKey());
         long postingId = createPosting(source.id(), p);
-        jdbc.sql("INSERT INTO jobs.job_source_link(canonical_job_id,source_posting_id,link_type,preferred) VALUES (:job,:posting,'AGGREGATOR',false)")
-                .param("job", job.id()).param("posting", postingId).update();
+        jdbc.sql("INSERT INTO jobs.job_source_link(canonical_job_id,source_posting_id,link_type,preferred) VALUES (:job,:posting,:linkType,false)")
+                .param("job", job.id()).param("posting", postingId)
+                .param("linkType", OFFICIAL_BOARD_SOURCES.contains(p.sourceKey()) ? "OFFICIAL" : "AGGREGATOR").update();
         recordPayload(runId, source.id(), postingId, p);
         if (merge || uncertain) audit(postingId, choice, job.id(), merge ? "AUTO_MERGED" : "KEPT_SEPARATE");
         rebuildSearch(job.id());
@@ -326,8 +336,7 @@ public class JdbcIngestionAdapter implements IngestionRepository {
                 VALUES (:id,:job,:country,:state,:stateKey,:city,:cityKey)
                 """).param("id",UUID.randomUUID()).param("job",job.id()).param("country",p.countryCode()).param("state",p.state())
                 .param("stateKey",p.stateNormalized()).param("city",p.city()).param("cityKey",p.cityNormalized()).update();
-        jdbc.sql("INSERT INTO jobs.job_requirement(public_id,canonical_job_id,requirement_text,category,mandatory,position) VALUES (:id,:job,:text,'OTHER',false,1)")
-                .param("id",UUID.randomUUID()).param("job",job.id()).param("text",p.description().substring(0,Math.min(500,p.description().length()))).update();
+        replaceRequirements(job.id(), p.description());
         inferSkill(job.id(),p);
         return job;
     }
@@ -346,6 +355,44 @@ public class JdbcIngestionAdapter implements IngestionRepository {
                 SET role_family_id=:role, seniority=:seniority, status='ACTIVE', updated_at=now(), version=version+1
                 WHERE id=:job
                 """).param("role", role).param("seniority", seniority).param("job", jobId).update();
+    }
+
+    private void updateJobDetails(long jobId, NormalizedPosting posting) {
+        jdbc.sql("""
+                UPDATE jobs.canonical_job SET description=:description, remote_mode=:remote, employment_type=:employment,
+                  salary_min_monthly=:salaryMin, salary_max_monthly=:salaryMax, currency=:currency,
+                  published_at=:published, updated_at=now(), version=version+1 WHERE id=:job
+                """).param("description", posting.description()).param("remote", posting.remoteMode())
+                .param("employment", posting.employmentType()).param("salaryMin", posting.salaryMinMonthly())
+                .param("salaryMax", posting.salaryMaxMonthly()).param("currency", posting.currency())
+                .param("published", Timestamp.from(posting.publishedAt())).param("job", jobId).update();
+        jdbc.sql("""
+                UPDATE jobs.job_location SET country_code=:country, state_name=:state, state_normalized=:stateKey,
+                  city_name=:city, city_normalized=:cityKey WHERE canonical_job_id=:job
+                """).param("country", posting.countryCode()).param("state", posting.state())
+                .param("stateKey", posting.stateNormalized()).param("city", posting.city())
+                .param("cityKey", posting.cityNormalized()).param("job", jobId).update();
+        replaceRequirements(jobId, posting.description());
+    }
+
+    private void replaceRequirements(long jobId, String description) {
+        jdbc.sql("DELETE FROM jobs.job_requirement WHERE canonical_job_id=:job AND category='OTHER' AND position=1")
+                .param("job", jobId).update();
+        String requirement = explicitRequirements(description);
+        if (requirement == null) return;
+        jdbc.sql("""
+                INSERT INTO jobs.job_requirement(public_id,canonical_job_id,requirement_text,category,mandatory,position)
+                VALUES (:id,:job,:text,'OTHER',true,1)
+                """).param("id", UUID.randomUUID()).param("job", jobId).param("text", requirement).update();
+    }
+
+    private static String explicitRequirements(String description) {
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile(
+                "(?is)(?:requirements|qualifications|what you(?:'|’)?ll need|what you bring|what we(?:'|’)?re looking for)\\s*[:\\-]?\\s*(.{30,1000}?)(?=(?:benefits|compensation|about |equal opportunity|$))")
+                .matcher(description);
+        if (!match.find()) return null;
+        String value = match.group(1).replaceAll("\\s+", " ").trim();
+        return value.isBlank() ? null : value.substring(0, Math.min(1000, value.length()));
     }
 
     private void inferSkill(long jobId, NormalizedPosting p) {

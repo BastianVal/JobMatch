@@ -78,6 +78,7 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+    networks: [private, egress]
 
   mailpit:
     image: axllent/mailpit:v1.27
@@ -121,6 +122,9 @@ networks:
   edge: {}
   private:
     internal: true
+  # Only background workers need outbound connectivity for explicitly configured
+  # connector hosts and SMTP. API, frontend and PostgreSQL remain private.
+  egress: {}
 
 volumes:
   postgres_data:
