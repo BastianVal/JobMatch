@@ -78,6 +78,17 @@ class DeterministicScoringV1Test {
         assertThat(scoring.evaluate(profile,job("SENIOR"),metRequirement).score()).isGreaterThan(new BigDecimal("44.00"));
     }
 
+    @Test void missingJobSeniorityIsNeutralAndNeverBreaksCompatibilityCalculation(){
+        var result=scoring.evaluate(profile("JUNIOR",12),job(null),
+                new JobFacts(null,null,null,List.of(),List.of(),List.of()));
+
+        assertThat(result.score()).isPositive();
+        assertThat(result.reasons()).anySatisfy(reason->{
+            assertThat(reason.component()).isEqualTo("SENIORITY_EXPERIENCE");
+            assertThat(reason.type()).isEqualTo("CONSIDERATION");
+        });
+    }
+
     private static ProfessionalProfile profile(String seniority,int months){
         UUID trajectory=UUID.randomUUID(),profileSkill=UUID.randomUUID();
         int endMonth=months;int endYear=2020+(endMonth-1)/12;int month=(endMonth-1)%12+1;

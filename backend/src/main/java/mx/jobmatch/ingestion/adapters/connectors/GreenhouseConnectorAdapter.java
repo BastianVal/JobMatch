@@ -76,6 +76,7 @@ public final class GreenhouseConnectorAdapter implements ConnectorPort {
             String description = htmlToText(text(job, "content"));
             if (blank(description)) description = title;
             Location location = location(job.path("location").path("name").asText(null), query.countryCode());
+            if (!"MX".equals(location.countryCode())) continue;
             String fullText = (title + " " + description + " " + value(location.city())).toLowerCase(Locale.ROOT);
             postings.add(new RawPosting("greenhouse:" + board + ":" + id, url, title,
                     query.employerName() == null ? board : query.employerName(), description,
@@ -109,11 +110,29 @@ public final class GreenhouseConnectorAdapter implements ConnectorPort {
     }
     private static String htmlToText(String html) {
         if (html == null) return null;
-        return html.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-                .replace("&#39;", "'").replace("&nbsp;", " ").replace("&amp;", "&")
+        String decoded = html;
+        // Greenhouse may encode rich text twice (for example, &amp;lt;p&amp;gt;).
+        // Decode a bounded number of times before interpreting the markup.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            String next = decodeEntities(decoded);
+            if (next.equals(decoded)) break;
+            decoded = next;
+        }
+        return decoded
                 .replaceAll("(?is)<(script|style)[^>]*>.*?</\\1>", " ")
-                .replaceAll("(?is)<[^>]+>", " ").replace("&nbsp;", " ")
-                .replaceAll("\\s+", " ").trim();
+                .replaceAll("(?is)<h[1-6][^>]*>", "\n\n")
+                .replaceAll("(?is)</h[1-6]>", "\n")
+                .replaceAll("(?is)<br\\s*/?>", "\n")
+                .replaceAll("(?is)<li[^>]*>", "\n• ")
+                .replaceAll("(?is)</(p|div|ul|ol)>", "\n")
+                .replaceAll("(?is)<[^>]+>", " ").replaceAll("[ \\t]+", " ")
+                .replaceAll("(?m)^[ \\t]+|[ \\t]+$", "")
+                .replaceAll("\\n(?:[ \\t]*\\n)+", "\n\n")
+                .replaceAll("\\n{3,}", "\n\n").trim();
+    }
+    private static String decodeEntities(String value) {
+        return value.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
+                .replace("&#39;", "'").replace("&nbsp;", " ").replace("&amp;", "&");
     }
     private static String text(JsonNode node, String name) {
         JsonNode value = node.path(name);

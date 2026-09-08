@@ -171,7 +171,8 @@ public class DeterministicScoringV1 {
     }
     private static YearMonth reference(JobDetail job){return YearMonth.from(job.publishedAt().atZone(ZoneOffset.UTC));}
     private static boolean juniorMismatch(String profile,String job,String title){return "JUNIOR".equals(profile)
-            && (Set.of("SENIOR","LEAD","MANAGER","DIRECTOR").contains(job)||JobFactExtractor.normalize(title).contains("architect"));}
+            && ((job!=null&&Set.of("SENIOR","LEAD","MANAGER","DIRECTOR").contains(job))
+            || JobFactExtractor.normalize(title).contains("architect"));}
     private static int level(String value){return switch(value){case "INTERN"->0;case "JUNIOR"->1;case "MID"->2;case "SENIOR"->3;case "LEAD"->4;case "MANAGER"->5;case "DIRECTOR"->6;default->0;};}
     private static String classification(double score){return score>=85?"EXCELLENT":score>=70?"STRONG":score>=50?"POSSIBLE":"LOW";}
     private static BigDecimal decimal(double value){return BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP);}

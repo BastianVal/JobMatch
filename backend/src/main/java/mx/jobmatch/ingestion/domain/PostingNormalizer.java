@@ -34,7 +34,7 @@ public final class PostingNormalizer {
         String dateBucket = DateTimeFormatter.ofPattern("uuuu-MM").withZone(ZoneOffset.UTC).format(raw.publishedAt());
         String identity = sha256(employerKey + "|" + titleKey + "|" + cityKey + "|" + dateBucket);
         return new NormalizedPosting(sourceKey, clean(raw.externalId()), url, sha256(url), title, titleKey,
-                employer, employerKey, clean(raw.description()), country, state, key(state), city, key(city),
+                employer, employerKey, cleanDescription(raw.description()), country, state, key(state), city, key(city),
                 upper(raw.remoteMode(), "ONSITE"), upper(raw.employmentType(), "FULL_TIME"),
                 upper(raw.seniority(), null), raw.salaryMinMonthly(), raw.salaryMaxMonthly(),
                 upper(raw.currency(), raw.salaryMinMonthly() == null ? null : "MXN"), raw.publishedAt(),
@@ -69,6 +69,12 @@ public final class PostingNormalizer {
     private static String clean(String value) {
         if (value == null) return null;
         String cleaned = Normalizer.normalize(value, Normalizer.Form.NFKC).replaceAll("\\s+", " ").trim();
+        return cleaned.isEmpty() ? null : cleaned;
+    }
+    private static String cleanDescription(String value) {
+        if (value == null) return null;
+        String cleaned = Normalizer.normalize(value, Normalizer.Form.NFKC).replace("\r\n", "\n")
+                .replaceAll("[ \\t]+", " ").replaceAll(" *\\n *", "\n").trim();
         return cleaned.isEmpty() ? null : cleaned;
     }
     private static String upper(String value, String fallback) {

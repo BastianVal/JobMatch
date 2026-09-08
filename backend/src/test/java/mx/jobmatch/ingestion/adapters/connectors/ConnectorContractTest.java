@@ -35,8 +35,8 @@ class ConnectorContractTest {
     void greenhouseNormalizesPublicBoardPayloadAndNamespacesExternalIds() throws Exception {
         String payload = """
                 {"jobs":[{"id":123,"absolute_url":"https://boards.greenhouse.io/c3iot/jobs/123",
-                "title":"Backend Engineer","content":"<p>Java &amp; APIs</p>",
-                "updated_at":"2026-09-01T12:00:00Z","location":{"name":"Buenos Aires, Argentina"}}]}""";
+                "title":"Backend Engineer","content":"&amp;lt;h2&amp;gt;Responsabilidades&amp;lt;/h2&amp;gt;&amp;lt;p&amp;gt;Java &amp;amp; APIs&amp;lt;/p&amp;gt;&amp;lt;ul&amp;gt;&amp;lt;li&amp;gt;Spring Boot&amp;lt;/li&amp;gt;&amp;lt;/ul&amp;gt;",
+                "updated_at":"2026-09-01T12:00:00Z","location":{"name":"Guadalajara, Jalisco, Mexico"}}]}""";
         var query = new ConnectorQuery(UUID.randomUUID(), null, null, null, "c3iot", "C3 AI", "MX");
         var page = GreenhouseConnectorAdapter.parse(payload, query, new ObjectMapper());
 
@@ -44,9 +44,9 @@ class ConnectorContractTest {
         assertThat(page.postings()).singleElement().satisfies(posting -> {
             assertThat(posting.externalId()).isEqualTo("greenhouse:c3iot:123");
             assertThat(posting.employer()).isEqualTo("C3 AI");
-            assertThat(posting.description()).isEqualTo("Java & APIs");
-            assertThat(posting.countryCode()).isEqualTo("AR");
-            assertThat(posting.city()).isEqualTo("Buenos Aires");
+            assertThat(posting.description()).isEqualTo("Responsabilidades\nJava & APIs\n\n• Spring Boot");
+            assertThat(posting.countryCode()).isEqualTo("MX");
+            assertThat(posting.city()).isEqualTo("Guadalajara");
             assertThat(PostingNormalizer.normalize("GREENHOUSE", posting).identityKey()).hasSize(64);
         });
     }
