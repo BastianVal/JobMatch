@@ -7,6 +7,10 @@ on:
         description: Immutable tag to publish and deploy; leave empty to use the triggering commit SHA.
         required: false
         type: string
+      rollback_image_tag:
+        description: Existing immutable image tag to deploy without publishing. Leave empty for a normal release.
+        required: false
+        type: string
       deploy:
         description: Deploy the published images to the configured EC2 host.
         required: true
@@ -17,14 +21,20 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  prepare:
     runs-on: ubuntu-24.04
     outputs:
       image_tag: ${{ steps.tag.outputs.value }}
     steps:
-      - uses: actions/checkout@v4
       - id: tag
-        run: echo "value=${{ inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+        run: echo "value=${{ inputs.rollback_image_tag || inputs.image_tag || github.sha }}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: prepare
+    if: inputs.rollback_image_tag == ''
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -35,17 +45,17 @@ jobs:
         with:
           context: backend
           push: true
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/jobmatch-backend:${{ steps.tag.outputs.value }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/jobmatch-backend:${{ needs.prepare.outputs.image_tag }}
       - name: Publish frontend image
         uses: docker/build-push-action@v6
         with:
           context: frontend
           push: true
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/jobmatch-frontend:${{ steps.tag.outputs.value }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/jobmatch-frontend:${{ needs.prepare.outputs.image_tag }}
 
   deploy:
-    if: inputs.deploy
-    needs: publish
+    if: ${{ always() && inputs.deploy && (inputs.rollback_image_tag != '' || needs.publish.result == 'success') }}
+    needs: [prepare, publish]
     runs-on: ubuntu-24.04
     steps:
       - name: Deploy immutable images
@@ -57,7 +67,7 @@ jobs:
           script: |
             set -eu
             cd /srv/jobmatch
-            export JOBMATCH_IMAGE_TAG='${{ needs.publish.outputs.image_tag }}'
+            export JOBMATCH_IMAGE_TAG='${{ needs.prepare.outputs.image_tag }}'
             docker compose --env-file .env -f compose.yaml -f compose.prod.yaml pull
             docker compose --env-file .env -f compose.yaml -f compose.prod.yaml up -d postgres frontend
             docker compose --env-file .env -f compose.yaml -f compose.prod.yaml up migrate

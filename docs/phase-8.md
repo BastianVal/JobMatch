@@ -83,7 +83,21 @@ Antes de activar el release se deben registrar estos secretos de GitHub:
 
 La instancia debe contener el repositorio en `/srv/jobmatch`, Docker Compose y el
 archivo `/srv/jobmatch/.env` basado en la plantilla. Para rollback, se ejecuta el
-mismo workflow indicando el SHA inmutable de la versión anterior.
+mismo workflow activando `deploy` e indicando ese SHA en `rollback_image_tag`.
+En ese modo no se construye ni se publica nada: sólo se descargan las imágenes ya
+publicadas con ese tag.
+
+Antes del primer despliegue, configura el DNS `A` (y `AAAA` si aplica) de
+`APP_HOST` hacia la instancia, abre únicamente los puertos 80 y 443 en el grupo
+de seguridad de EC2 y ejecuta en el host:
+
+```sh
+cd /srv/jobmatch
+sh scripts/preflight-production.sh /srv/jobmatch/.env
+```
+
+El preflight no imprime secretos; comprueba los valores obligatorios, rechaza los
+placeholders de la plantilla y valida la composición que se desplegará.
 
 ## Prueba de carga de búsqueda
 
