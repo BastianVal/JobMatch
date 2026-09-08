@@ -34,7 +34,7 @@ export function setup() {
     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.json('token') },
   });
   check(login, { 'cuenta de carga autenticada': (result) => result.status === 204 });
-  const session = jar.cookiesForURL(baseUrl)[cookieName]?.[0]?.value;
+  const session = login.cookies[cookieName]?.[0]?.value || jar.cookiesForURL(baseUrl)[cookieName]?.[0]?.value;
   if (!session) throw new Error(`El login no devolvió la cookie ${cookieName}.`);
   return { sessionCookie: session };
 }

@@ -104,6 +104,20 @@ Si el proveedor de ejecución no permite enviar credenciales, sustituye las dos
 variables anteriores por `K6_SESSION_COOKIE`. Nunca guardes la contraseña o la
 cookie en el repositorio, en el script ni en la salida de CI.
 
+Para una prueba local con Docker, k6 debe entrar a la red privada del proyecto;
+`localhost` dentro del contenedor de k6 no es el equipo anfitrión. En ese caso
+usa `http://api:8080` y el nombre de cookie local:
+
+```sh
+docker run --rm --network jobmatch-local_private \
+  -v "$PWD:/work:ro" -w /work \
+  -e K6_BASE_URL=http://api:8080 \
+  -e K6_EMAIL='carga@example.com' \
+  -e K6_PASSWORD='contraseña-de-prueba' \
+  -e K6_SESSION_COOKIE_NAME=jobmatch_session \
+  grafana/k6:0.54.0 run tests/load/search.js
+```
+
 Por defecto son 50 usuarios virtuales durante dos minutos y la prueba falla si el
 p95 de la búsqueda supera 500 ms o si hay 1% o más de errores. Después se revisan
 las consultas lentas con `EXPLAIN ANALYZE` antes de cambiar índices.
