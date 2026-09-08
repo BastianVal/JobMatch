@@ -4,10 +4,8 @@ import { check, sleep } from 'k6';
 const baseUrl = (__ENV.K6_BASE_URL || 'http://localhost:8090').replace(/\/$/, '');
 const cookieName = __ENV.K6_SESSION_COOKIE_NAME || 'jobmatch_session';
 const sessionCookie = __ENV.K6_SESSION_COOKIE;
-
-if (!sessionCookie) {
-  throw new Error('Define K6_SESSION_COOKIE con una sesión autenticada de pruebas.');
-}
+const email = __ENV.K6_EMAIL;
+const password = __ENV.K6_PASSWORD;
 
 export const options = {
   scenarios: {
@@ -23,9 +21,27 @@ export const options = {
   },
 };
 
-export default function () {
+export function setup() {
+  if (sessionCookie) return { sessionCookie };
+  if (!email || !password) {
+    throw new Error('Define K6_SESSION_COOKIE o K6_EMAIL y K6_PASSWORD de una cuenta de pruebas verificada.');
+  }
+
+  const jar = http.cookieJar();
+  const csrf = http.get(`${baseUrl}/api/v1/auth/csrf`);
+  check(csrf, { 'CSRF disponible': (result) => result.status === 200 && Boolean(result.json('token')) });
+  const login = http.post(`${baseUrl}/api/v1/auth/login`, JSON.stringify({ email, password }), {
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.json('token') },
+  });
+  check(login, { 'cuenta de carga autenticada': (result) => result.status === 204 });
+  const session = jar.cookiesForURL(baseUrl)[cookieName]?.[0]?.value;
+  if (!session) throw new Error(`El login no devolvió la cookie ${cookieName}.`);
+  return { sessionCookie: session };
+}
+
+export default function ({ sessionCookie: authenticatedCookie }) {
   const response = http.get(`${baseUrl}/api/v1/jobs/search?limit=25`, {
-    headers: { Cookie: `${cookieName}=${sessionCookie}` },
+    headers: { Cookie: `${cookieName}=${authenticatedCookie}` },
     tags: { endpoint: 'job-search' },
   });
   check(response, {

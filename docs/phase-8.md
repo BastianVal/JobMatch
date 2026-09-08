@@ -88,15 +88,21 @@ mismo workflow indicando el SHA inmutable de la versión anterior.
 ## Prueba de carga de búsqueda
 
 `tests/load/search.js` usa k6 y prueba solamente la búsqueda local autenticada;
-no consulta conectores ni APIs de terceros. Obtén una cookie de una cuenta de
-pruebas y ejecuta en staging:
+no consulta conectores ni APIs de terceros. Usa una cuenta de pruebas verificada
+y que no tenga acceso administrativo. Puede iniciar sesión con sus credenciales
+(recomendado) o recibir una cookie ya creada:
 
 ```sh
 K6_BASE_URL=https://staging.example.com \
-K6_SESSION_COOKIE='valor-de-la-cookie' \
+K6_EMAIL='carga@example.com' \
+K6_PASSWORD='contraseña-de-prueba' \
 K6_SESSION_COOKIE_NAME='__Host-jobmatch_session' \
 k6 run tests/load/search.js
 ```
+
+Si el proveedor de ejecución no permite enviar credenciales, sustituye las dos
+variables anteriores por `K6_SESSION_COOKIE`. Nunca guardes la contraseña o la
+cookie en el repositorio, en el script ni en la salida de CI.
 
 Por defecto son 50 usuarios virtuales durante dos minutos y la prueba falla si el
 p95 de la búsqueda supera 500 ms o si hay 1% o más de errores. Después se revisan
