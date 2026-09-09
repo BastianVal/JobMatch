@@ -71,7 +71,7 @@ public class DiscoveryService {
 
     private static JobSearchCriteria normalize(JobSearchCriteria input, boolean includePage) {
         if (input == null) input = new JobSearchCriteria(null, List.of(), List.of(), List.of(), null,
-                null, null, null, null, false, null, null);
+                null, null, null, null, null, false, null, null);
         if (input.roleFamilyIds().size() > 10) throw new InvalidSearch("Solo se permiten 10 roles por búsqueda.");
         if (new HashSet<>(input.roleFamilyIds()).size() != input.roleFamilyIds().size())
             throw new InvalidSearch("Los roles de búsqueda deben ser únicos.");
@@ -88,9 +88,14 @@ public class DiscoveryService {
         int limit = includePage ? (input.limit() == null ? 25 : input.limit()) : 25;
         if (limit < 1 || limit > 25) throw new InvalidSearch("El límite debe estar entre 1 y 25.");
         return new JobSearchCriteria(text(input.query(), 200), input.roleFamilyIds(), remote, employment,
-                country, normalizedLookup(input.state(), 120), normalizedLookup(input.city(), 160),
+                country, normalizedLookup(firstPresent(input.place(), input.city(), input.state()), 160), null, null,
                 input.minimumMonthlySalary(), input.publishedWithinDays(), input.excludeEmployers(), limit,
                 includePage ? input.cursor() : null);
+    }
+
+    /** The old state/city parameters are accepted only to keep existing saved searches usable. */
+    private static String firstPresent(String first, String second, String third) {
+        return text(first, 160) != null ? first : text(second, 160) != null ? second : third;
     }
 
     private static List<String> choices(List<String> values, Set<String> allowed, String label) {

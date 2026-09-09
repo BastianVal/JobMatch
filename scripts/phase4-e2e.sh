@@ -53,6 +53,9 @@ status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$coo
 grep -q '"countryCode":"MX"' "$body"
 if grep -Eq '"countryCode":"(AR|US|BR|CO|CL|CA|ES|GB|IN)"' "$body"; then echo 'foreign job leaked into Mexico search' >&2; exit 1; fi
 job_id="$(grep -o '"id":"[^"]*"' "$body" | head -1 | cut -d '"' -f 4)"; test -n "$job_id"
+status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" \
+  "$base_url/api/v1/jobs/search?countryCode=MX&place=guadal&limit=10")"; test "$status" = '200'
+grep -q '"city":"Guadalajara"' "$body"
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" "$base_url/api/v1/jobs/$job_id")"; test "$status" = '200'
 grep -q '"sourceLinks"' "$body"; grep -Eq '"source":"(Greenhouse|Lever|Ashby)"' "$body"
 
@@ -64,4 +67,4 @@ test "$status" = '202'; grep -q '"status":"COOLDOWN"' "$body"; grep -q '"schedul
 
 status="$(curl -sS -H "Host: $host_header" -o "$body" -w '%{http_code}' -b "$cookies" -X DELETE \
   -H "X-CSRF-TOKEN: $csrf" "$base_url/api/v1/me/account")"; test "$status" = '204'
-printf 'phase4-e2e: OK (public boards, Mexico-only search, detail, cooldown and navigation)\n'
+printf 'phase4-e2e: OK (public boards, Mexico-only and partial-place search, detail, cooldown and navigation)\n'

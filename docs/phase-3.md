@@ -36,7 +36,7 @@ Parámetros disponibles en búsqueda:
 | `roleFamilyId` | UUID repetible; permite combinar hasta 10 roles. |
 | `remoteMode` | `REMOTE`, `HYBRID` u `ONSITE`; repetible. |
 | `employmentType` | `FULL_TIME`, `PART_TIME`, `CONTRACT` o `INTERNSHIP`; repetible. |
-| `countryCode`, `state`, `city` | Ubicación estricta normalizada sin acentos. |
+| `countryCode`, `place` | País y lugar. `place` busca una coincidencia contenida, normalizada sin acentos, tanto en ciudad como en estado. |
 | `minimumMonthlySalary` | Requiere que el salario máximo conocido alcance el mínimo. |
 | `publishedWithinDays` | Ventana entre 1 y 365 días. |
 | `excludeEmployers` | Aplica las empresas excluidas del perfil cuando es `true`. |
@@ -48,6 +48,10 @@ Ejemplo multirol:
 ```text
 GET /api/v1/jobs/search?q=Java&roleFamilyId=<rol-1>&roleFamilyId=<rol-2>&remoteMode=REMOTE&limit=20
 ```
+
+Por ejemplo, `countryCode=MX&place=puebla` coincide con una ubicación como
+`Puebla City`. Los parámetros `state` y `city` permanecen sólo como compatibilidad
+temporal para búsquedas guardadas creadas antes de este cambio.
 
 Una búsqueda guardada recibe un nombre y los mismos criterios, sin datos de paginación:
 

@@ -52,13 +52,9 @@ public class JdbcJobSearchAdapter implements JobSearchRepository {
             filters.append(" AND document.country_code=:country ");
             parameters.put("country", criteria.countryCode());
         }
-        if (criteria.state() != null) {
-            filters.append(" AND document.state_normalized=:state ");
-            parameters.put("state", criteria.state());
-        }
-        if (criteria.city() != null) {
-            filters.append(" AND document.city_normalized=:city ");
-            parameters.put("city", criteria.city());
+        if (criteria.place() != null) {
+            filters.append(" AND (document.state_normalized LIKE :place ESCAPE '\\' OR document.city_normalized LIKE :place ESCAPE '\\') ");
+            parameters.put("place", "%" + escapeLike(criteria.place()) + "%");
         }
         if (criteria.minimumMonthlySalary() != null) {
             filters.append(" AND document.salary_max_monthly>=:salary ");
@@ -129,6 +125,10 @@ public class JdbcJobSearchAdapter implements JobSearchRepository {
             next = SearchCursor.encode(last.relevance(), last.publishedAt(), last.id());
         }
         return new CursorPage<>(items, next);
+    }
+
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     @Override

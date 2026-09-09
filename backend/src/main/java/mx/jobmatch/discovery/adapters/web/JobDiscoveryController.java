@@ -34,6 +34,7 @@ public class JobDiscoveryController {
             @RequestParam(required = false) List<String> remoteMode,
             @RequestParam(required = false) List<String> employmentType,
             @RequestParam(required = false) String countryCode,
+            @RequestParam(required = false) String place,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String city,
             @RequestParam(required = false) BigDecimal minimumMonthlySalary,
@@ -42,7 +43,7 @@ public class JobDiscoveryController {
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor) {
         return discovery.search(principal.accountId(), new JobSearchCriteria(q, roleFamilyId, remoteMode,
-                employmentType, countryCode, state, city, minimumMonthlySalary, publishedWithinDays,
+                employmentType, countryCode, place, state, city, minimumMonthlySalary, publishedWithinDays,
                 excludeEmployers, limit, cursor));
     }
 

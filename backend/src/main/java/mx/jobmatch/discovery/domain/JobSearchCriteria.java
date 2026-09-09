@@ -10,6 +10,7 @@ public record JobSearchCriteria(
         List<String> remoteModes,
         List<String> employmentTypes,
         String countryCode,
+        String place,
         String state,
         String city,
         BigDecimal minimumMonthlySalary,

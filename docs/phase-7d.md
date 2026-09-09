@@ -3,7 +3,7 @@
 ## Alcance entregado
 
 - “Explorar” incorpora filtros interactivos de texto, roles múltiples, modalidad,
-  tipo de empleo, país, estado, ciudad, salario mínimo, antigüedad y empresas
+  tipo de empleo, país, lugar, salario mínimo, antigüedad y empresas
   excluidas del perfil.
 - Las familias de roles se seleccionan únicamente desde el catálogo publicado;
   admite hasta diez y consulta sugerencias después de dos caracteres.
@@ -39,6 +39,11 @@ Los filtros que aceptan múltiples valores se repiten en la URL, por ejemplo:
 ```text
 /api/v1/jobs/search?roleFamilyId=<uuid>&roleFamilyId=<uuid>&remoteMode=REMOTE&remoteMode=HYBRID
 ```
+
+`place` sustituye los campos separados de estado y ciudad en la interfaz. Es una
+coincidencia contenida, sin importar mayúsculas ni acentos, sobre cualquiera de
+los dos valores: `place=puebla` encuentra `Puebla City`. Los parámetros antiguos
+`state` y `city` se aceptan temporalmente al restaurar búsquedas ya guardadas.
 
 ## Verificación
 
