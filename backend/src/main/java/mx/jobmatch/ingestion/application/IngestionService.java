@@ -34,7 +34,10 @@ public class IngestionService {
         for (var query : schedule.queries()) {
             String payload = "{\"queryId\":\"" + query.query().id() + "\",\"refreshId\":\""
                     + schedule.refresh().id() + "\"}";
-            tasks.enqueue("SYNC_CONNECTOR", payload, query.sourceKey() + ":" + query.query().id() + ":" + bucket,
+            // A refresh is a distinct user-visible operation. Reusing a completed task from the
+            // same cooldown bucket leaves the new refresh permanently SCHEDULED.
+            tasks.enqueue("SYNC_CONNECTOR", payload, query.sourceKey() + ":" + query.query().id() + ":"
+                            + schedule.refresh().id() + ":" + bucket,
                     now, 3);
         }
         return schedule.refresh();

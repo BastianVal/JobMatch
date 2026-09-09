@@ -53,16 +53,14 @@ Los estados terminales son `COMPLETED`, `PARTIAL` y `FAILED`. Una repetición de
 
 ## Simulación local
 
-Cada adaptador produce una vacante Backend compartida y una vacante propia. La compartida permite comprobar que cinco publicaciones terminan enlazadas a una sola vacante canónica.
-
-Para provocar una falla aislada se usa como prefijo `FAIL_<FUENTE>`, por ejemplo `FAIL_JOOBLE_demo`. Esto existe únicamente en los simuladores locales.
+Las bolsas públicas se sincronizan como snapshots completos y se normalizan al modelo canónico. La búsqueda de un usuario no proporciona una URL de ATS ni desencadena simuladores: puede solicitar una actualización de las bolsas públicas habilitadas, siempre respetando su cooldown compartido.
 
 ## Evidencia automatizada
 
 - `PostingNormalizerTest`: canonicalización de texto y URL, hashes y clave de identidad estable.
 - `DeduplicationPolicyTest`: ponderaciones y límites de consolidación automática o separación auditable.
-- `ConnectorContractTest`: contrato normalizable de los cinco adaptadores y aislamiento de una fuente fallida.
-- `scripts/phase4-e2e.sh`: sesión real, cola, cinco fuentes, consolidación, cooldown, reintentos, resultado parcial y navegación disponible.
+- `ConnectorContractTest`: contrato normalizable de los conectores y exclusión de ubicaciones extranjeras.
+- `scripts/phase4-e2e.sh`: sesión real, actualización de seis bolsas públicas, búsqueda exclusiva de México, detalle, cooldown y navegación disponible.
 - Flyway V5, V6 y V7 se aplican contra PostgreSQL 17 real.
 
 Con el stack levantado, la prueba integral se ejecuta desde la raíz:

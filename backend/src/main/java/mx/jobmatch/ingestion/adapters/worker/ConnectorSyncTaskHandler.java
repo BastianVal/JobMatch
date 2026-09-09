@@ -45,9 +45,10 @@ public class ConnectorSyncTaskHandler implements BackgroundTaskHandler {
         boolean permit = repository.acquireRequestPermit(query.sourceKey(), payload.queryId(), task.publicId(), Instant.now());
         if (!permit) {
             // A quota, lease or open circuit rejected this attempt before an outbound request was made.
-            // Counting that as a source failure used to extend an already-open circuit indefinitely.
+            // It must be retried, but must never count as a provider failure or extend its circuit.
             repository.failRun(runId, "SOURCE_UNAVAILABLE");
-            return;
+            if (payload.refreshId() != null && task.attempts() >= 3) repository.connectorFailed(payload.refreshId());
+            throw new ConnectorFailure("SOURCE_UNAVAILABLE", true);
         }
         try {
             ConnectorPort connector = connectors.stream().filter(item -> item.sourceKey().equals(query.sourceKey()))

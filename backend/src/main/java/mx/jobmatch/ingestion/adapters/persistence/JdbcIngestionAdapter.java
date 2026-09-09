@@ -23,7 +23,6 @@ import static mx.jobmatch.ingestion.application.IngestionExceptions.InvalidRefre
 
 @Repository
 public class JdbcIngestionAdapter implements IngestionRepository {
-    private static final List<String> SOURCES = List.of("JOOBLE", "ADZUNA", "GREENHOUSE", "LEVER", "ASHBY");
     private static final List<String> OFFICIAL_BOARD_SOURCES = List.of("GREENHOUSE", "LEVER", "ASHBY");
     private final JdbcClient jdbc;
     private final CatalogRoleResolver roles;
@@ -43,30 +42,14 @@ public class JdbcIngestionAdapter implements IngestionRepository {
                 .orElseThrow(() -> new InvalidRefresh("La familia de rol no existe."));
         List<QuerySource> scheduled = new ArrayList<>();
         Instant nextAllowed = now.plusSeconds(900);
-        for (String sourceKey : SOURCES) {
-            String admittedLocation = sourceKey.equals("JOOBLE") || sourceKey.equals("ADZUNA") ? locationQuery : null;
-            String signature = PostingNormalizer.sha256(sourceKey + "|" + value(roleQuery) + "|" + value(admittedLocation));
-            QueryRow query = jdbc.sql("""
-                    INSERT INTO ingestion.connector_query(public_id, source_id, query_signature, role_query, location_query)
-                    SELECT :id, id, :signature, :role, :location FROM jobs.source WHERE source_key=:source
-                    ON CONFLICT (source_id, query_signature) DO UPDATE SET enabled=true
-                    RETURNING id, public_id, last_requested_at
-                    """).param("id", UUID.randomUUID()).param("signature", signature).param("role", roleQuery)
-                    .param("location", admittedLocation).param("source", sourceKey)
-                    .query((rs, n) -> new QueryRow(rs.getLong("id"), rs.getObject("public_id", UUID.class),
-                            instant(rs.getTimestamp("last_requested_at")))).single();
-            jdbc.sql("""
-                    INSERT INTO ingestion.query_demand(connector_query_id, account_id, role_family_id)
-                    VALUES (:query, :account, :role)
-                    ON CONFLICT (connector_query_id, account_id) DO UPDATE SET
-                      role_family_id=excluded.role_family_id, last_demanded_at=now()
-                    """).param("query", query.internalId()).param("account", account).param("role", role).update();
+        for (QueryRow query : enabledPublicBoards()) {
             Instant allowed = query.lastRequestedAt() == null ? now : query.lastRequestedAt().plusSeconds(900);
             if (!allowed.isAfter(now)) {
                 jdbc.sql("UPDATE ingestion.connector_query SET last_requested_at=:now, next_scheduled_at=:next WHERE id=:id")
                         .param("now", Timestamp.from(now)).param("next", Timestamp.from(nextAllowed))
                         .param("id", query.internalId()).update();
-                scheduled.add(new QuerySource(new ConnectorQuery(query.id(), roleQuery, admittedLocation, null), sourceKey));
+                scheduled.add(new QuerySource(new ConnectorQuery(query.publicId(), roleQuery, locationQuery, null,
+                        query.boardKey(), query.employerName(), query.countryCode()), query.sourceKey()));
             } else if (allowed.isBefore(nextAllowed)) nextAllowed = allowed;
         }
         UUID refreshId = UUID.randomUUID();
@@ -468,7 +451,21 @@ public class JdbcIngestionAdapter implements IngestionRepository {
     private JobRefresh mapRefresh(java.sql.ResultSet rs,int n)throws java.sql.SQLException{return new JobRefresh(rs.getObject("public_id",UUID.class),rs.getString("status"),rs.getInt("scheduled_connectors"),rs.getInt("completed_connectors"),rs.getInt("failed_connectors"),rs.getTimestamp("next_allowed_at").toInstant(),rs.getTimestamp("created_at").toInstant());}
     private static Instant instant(Timestamp timestamp){return timestamp==null?null:timestamp.toInstant();}
     private static String value(String value){return value==null?"":value;}
-    private record QueryRow(long internalId,UUID id,Instant lastRequestedAt){}
+    private List<QueryRow> enabledPublicBoards() {
+        return jdbc.sql("""
+                SELECT query.id, query.public_id, query.last_requested_at, source.source_key,
+                       board.board_key, board.employer_name, board.country_code
+                FROM ingestion.connector_query query
+                JOIN ingestion.public_job_board board ON board.id=query.board_id AND board.enabled
+                JOIN jobs.source source ON source.id=query.source_id
+                WHERE query.enabled
+                ORDER BY source.source_key, board.board_key
+                """).query((rs, n) -> new QueryRow(rs.getLong("id"), rs.getObject("public_id", UUID.class),
+                instant(rs.getTimestamp("last_requested_at")), rs.getString("source_key"), rs.getString("board_key"),
+                rs.getString("employer_name"), rs.getString("country_code"))).list();
+    }
+    private record QueryRow(long internalId, UUID publicId, Instant lastRequestedAt, String sourceKey,
+                            String boardKey, String employerName, String countryCode){}
     private record SourceRow(long id,UUID publicId){}
     private record ExistingLink(long postingId,long jobId,UUID jobPublicId){}
     private record JobRow(long id,UUID publicId){}
