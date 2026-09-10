@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,9 +42,16 @@ public class JdbcJobSearchAdapter implements JobSearchRepository {
         if (criteria.query() == null) {
             relevance = "0.000000::numeric";
         } else {
-            relevance = "round(ts_rank_cd(document.search_vector, websearch_to_tsquery('spanish', unaccent(:query)))::numeric, 6)";
-            filters.append(" AND document.search_vector @@ websearch_to_tsquery('spanish', unaccent(:query)) ");
+            String looseQuery = looseTextQuery(criteria.query());
+            relevance = looseQuery == null
+                    ? "round(ts_rank_cd(document.search_vector, websearch_to_tsquery('spanish', unaccent(:query)))::numeric, 6)"
+                    : "round(GREATEST(ts_rank_cd(document.search_vector, websearch_to_tsquery('spanish', unaccent(:query))), "
+                    + "ts_rank_cd(document.search_vector, to_tsquery('spanish', :looseQuery)))::numeric, 6)";
+            filters.append(" AND (document.search_vector @@ websearch_to_tsquery('spanish', unaccent(:query)) ");
+            if (looseQuery != null) filters.append(" OR document.search_vector @@ to_tsquery('spanish', :looseQuery) ");
+            filters.append(") ");
             parameters.put("query", criteria.query());
+            if (looseQuery != null) parameters.put("looseQuery", looseQuery);
         }
         appendIn(filters, parameters, "family.public_id", "role", criteria.roleFamilyIds());
         appendIn(filters, parameters, "document.remote_mode", "remote", criteria.remoteModes());
@@ -129,6 +137,15 @@ public class JdbcJobSearchAdapter implements JobSearchRepository {
 
     private static String escapeLike(String value) {
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private static String looseTextQuery(String value) {
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+                .toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", " ").strip();
+        String query = java.util.Arrays.stream(normalized.split("\\s+"))
+                .filter(term -> term.length() >= 2).distinct().map(term -> term + ":*")
+                .reduce((left, right) -> left + " | " + right).orElse(null);
+        return query;
     }
 
     @Override

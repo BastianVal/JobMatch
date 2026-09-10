@@ -34,4 +34,11 @@ class RoleTitleMatcherTest {
         var role = new RoleTitleMatcher.Role(JAVA, "Desarrollador Java", List.of("go"));
         assertThat(RoleTitleMatcher.match("Golang developer", List.of(role))).isEmpty();
     }
+
+    @Test
+    void resolvesRelatedEngineeringTitlesUsingTheirDistinctiveTechnology() {
+        var match = RoleTitleMatcher.match("Senior Java Engineer", ROLES).orElseThrow();
+        assertThat(match.roleFamilyId()).isEqualTo(JAVA);
+        assertThat(match.seniority()).isEqualTo("SENIOR");
+    }
 }
