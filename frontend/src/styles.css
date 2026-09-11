@@ -39,7 +39,6 @@ nav button.active, nav button:hover { background: #ffffff14; color: white; }
 .explore-filters { display: grid; gap: 14px; border: 1px solid #d6d4ca; border-radius: 18px; padding: 18px; background: #fffdf8; }
 .filter-main { display: grid; grid-template-columns: minmax(230px,1fr) minmax(180px,250px) auto auto auto; align-items: end; gap: 10px; }
 .filter-main label { min-width: 0; }.search-field { position: relative; }
-.place-field small { display: block; margin-top: 4px; color: #68736b; font-size: .74rem; font-weight: 600; }
 .filter-details { border-top: 1px solid #e5e1d8; padding-top: 13px; }
 .filter-details summary { cursor: pointer; color: #3d4c43; font-size: .85rem; font-weight: 800; }
 .filter-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-top: 16px; }

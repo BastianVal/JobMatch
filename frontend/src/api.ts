@@ -37,6 +37,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     let problem: ApiProblem = { status: response.status };
     try { problem = { ...problem, ...(await response.json()) }; } catch { /* respuesta sin cuerpo */ }
     if (response.status === 403) csrf = undefined;
+    if (response.status === 401 || problem.code === 'AUTHENTICATION_REQUIRED') {
+      csrf = undefined;
+      window.dispatchEvent(new Event('jobmatch:session-expired'));
+    }
     throw new ApiError(problem);
   }
   if (response.status === 204 || response.headers.get('content-length') === '0') return undefined as T;

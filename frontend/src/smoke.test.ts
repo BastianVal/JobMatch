@@ -26,6 +26,15 @@ describe('frontend foundation', () => {
       problem: expect.objectContaining({ status: 409, code: 'VERSION_CONFLICT' })
     } satisfies Partial<ApiError>);
   });
+
+  it('announces an expired session so the app can return to login', async () => {
+    const expired = vi.fn();
+    vi.stubGlobal('window', { dispatchEvent: expired });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'AUTHENTICATION_REQUIRED' }), { status: 401 })));
+
+    await expect(api('/me/account')).rejects.toMatchObject({ problem: expect.objectContaining({ status: 401 }) });
+    expect(expired).toHaveBeenCalledOnce();
+  });
 });
 
 afterEach(() => { vi.unstubAllGlobals(); resetCsrf(); });
