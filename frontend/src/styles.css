@@ -37,12 +37,13 @@ nav button.active, nav button:hover { background: #ffffff14; color: white; }
 .searchbar { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 24px; }
 .explore-page { display: grid; gap: 20px; }
 .explore-filters { display: grid; gap: 14px; border: 1px solid #d6d4ca; border-radius: 18px; padding: 18px; background: #fffdf8; }
-.filter-main { display: grid; grid-template-columns: minmax(230px,1fr) minmax(180px,250px) auto auto auto; align-items: end; gap: 10px; }
+.filter-main { display: grid; grid-template-columns: minmax(230px,1fr) auto auto auto; align-items: end; gap: 10px; }
 .filter-main label { min-width: 0; }.search-field { position: relative; }
-.filter-details { border-top: 1px solid #e5e1d8; padding-top: 13px; }
-.filter-details summary { cursor: pointer; color: #3d4c43; font-size: .85rem; font-weight: 800; }
-.filter-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin-top: 16px; }
-.filter-grid>.picker { position: relative; grid-column: span 3; }
+.filter-tabs { display: flex; gap: 8px; overflow-x: auto; border-top: 1px solid #e5e1d8; padding-top: 14px; }
+.filter-tabs button { flex: 0 0 auto; border-color: #d6d4ca; padding: 8px 12px; background: #f7f6f0; color: #4b5a50; font-size: .8rem; }
+.filter-tabs button.active { border-color: #5e9875; background: #e4f0e7; color: #245d3d; }
+.filter-tab-panel { display: grid; align-items: start; min-height: 96px; border: 1px solid #e1dfd7; border-radius: 12px; padding: 14px; background: #fbfaf5; }
+.filter-tab-panel>label { width: min(100%,340px); }.filter-tab-panel>.picker { position: relative; width: min(100%,720px); }.filter-tab-panel .choice-field { border: 0; padding: 0; }
 .choice-field { align-content: start; gap: 8px; padding: 12px; }
 .choice-field label { display: flex; grid-template-columns: auto 1fr; align-items: center; font-weight: 600; }
 .choice-field input { width: auto; }
@@ -180,5 +181,5 @@ legend { padding: 0 6px; color: #45534a; font-size: .84rem; font-weight: 800; }
 .tag-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
 .field-error { margin: 0; color: #9a3f31; font-size: .78rem; font-weight: 650; }
 .editor-footer { display: flex; justify-content: flex-end; gap: 10px; }
-@media (max-width: 900px) { .profile-hero,.profile-columns,.explore-workspace { grid-template-columns: 1fr; }.job-stack { max-height: 470px; overflow: auto; }.filter-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }.filter-grid>.picker { grid-column: span 2; } }
-@media (max-width: 760px) { .auth-shell { grid-template-columns: 1fr; margin: 20px auto; } .brand-panel { padding: 42px 30px; } .app-shell { display: block; } aside { position: static; height: auto; padding: 18px; } aside>div, aside>.quiet { display: none; } nav { grid-template-columns: repeat(5,1fr); gap: 2px; margin: 0; overflow-x: auto; } nav button { padding: 9px 6px; text-align: center; font-size: .72rem; } .workspace { padding: 28px 16px 60px; } .form-grid, .form-grid.compact,.tracking-card,.filter-grid,.job-detail-facts { grid-template-columns: 1fr; } .filter-grid>.picker { grid-column: auto; }.filter-main { grid-template-columns: 1fr; }.filter-main button { width: 100%; }.save-search { display: grid; justify-content: stretch; }.save-search label { min-width: 0; }.profile-toolbar { align-items: flex-start; } .profile-toolbar.sticky { position: static; } .profile-toolbar.sticky .actions { justify-content: flex-end; } .profile-hero { padding: 23px; } }
+@media (max-width: 900px) { .profile-hero,.profile-columns,.explore-workspace { grid-template-columns: 1fr; }.job-stack { max-height: 470px; overflow: auto; } }
+@media (max-width: 760px) { .auth-shell { grid-template-columns: 1fr; margin: 20px auto; } .brand-panel { padding: 42px 30px; } .app-shell { display: block; } aside { position: static; height: auto; padding: 18px; } aside>div, aside>.quiet { display: none; } nav { grid-template-columns: repeat(5,1fr); gap: 2px; margin: 0; overflow-x: auto; } nav button { padding: 9px 6px; text-align: center; font-size: .72rem; } .workspace { padding: 28px 16px 60px; } .form-grid, .form-grid.compact,.tracking-card,.job-detail-facts { grid-template-columns: 1fr; } .filter-main { grid-template-columns: 1fr; }.filter-main button { width: 100%; }.filter-tab-panel { min-height: 108px; }.save-search { display: grid; justify-content: stretch; }.save-search label { min-width: 0; }.profile-toolbar { align-items: flex-start; } .profile-toolbar.sticky { position: static; } .profile-toolbar.sticky .actions { justify-content: flex-end; } .profile-hero { padding: 23px; } }
