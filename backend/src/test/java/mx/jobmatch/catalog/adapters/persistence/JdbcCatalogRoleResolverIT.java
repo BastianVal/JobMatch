@@ -43,15 +43,17 @@ class JdbcCatalogRoleResolverIT {
                 JOIN catalog.catalog_version version ON version.id=role.catalog_version_id
                 WHERE version.version_no=2 AND version.status='PUBLISHED' AND role.selectable
                 """).query(Integer.class).single()).isEqualTo(42);
-        assertThat(jdbc.sql("SELECT count(*) FROM catalog.role_alias").query(Integer.class).single()).isEqualTo(165);
+        // V25 adds public-board title variants such as "Java Engineer" to the 165
+        // aliases originally seeded in V12. Keep the migration contract explicit.
+        assertThat(jdbc.sql("SELECT count(*) FROM catalog.role_alias").query(Integer.class).single()).isEqualTo(190);
     }
 
     @Test
     void searchFindsContainedTermsAndAliases() {
         var catalog = new JdbcCatalogQueryAdapter(jdbc);
-        assertThat(catalog.roles("java", 10)).extracting("displayName").containsExactly("Desarrollador Java");
+        assertThat(catalog.roles("java", 10)).extracting("name").containsExactly("Desarrollador Java");
         assertThat(catalog.roles("developer", 25)).isNotEmpty();
-        assertThat(catalog.roles("datos", 25)).extracting("displayName")
+        assertThat(catalog.roles("datos", 25)).extracting("name")
                 .contains("Analista de Datos", "Científico de Datos", "Ingeniero de Datos");
     }
 
