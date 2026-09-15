@@ -1,6 +1,6 @@
-# JobMatch México
+# JobMatch
 
-JobMatch México turns a professional profile into explainable recommendations for technology jobs. It centralizes public job boards configured by the platform, normalizes roles and skills, calculates deterministic compatibility, and preserves the history of every application.
+JobMatch turns a professional profile into explainable recommendations for technology jobs. It centralizes public job boards configured by the platform, normalizes roles and skills, calculates deterministic compatibility, and preserves the history of every application.
 
 It is designed for candidates who want to understand why a job fits —or what they still need to document— and for engineers who need a traceable, reproducible, deployable application that does not rely on AI to produce its score.
 
